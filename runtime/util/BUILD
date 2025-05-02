@@ -32,7 +32,7 @@ cc_library(
         "@litert//litert/cc:litert_expected",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 
@@ -47,7 +47,7 @@ cc_test(
         "@litert//litert/c:litert_tensor_buffer_types",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
         "@litert//litert/test:matchers",
     ],
 )
@@ -112,7 +112,7 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@litert//litert/c:litert_tensor_buffer_types",
         "@litert//litert/cc:litert_element_type",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 
@@ -126,7 +126,7 @@ cc_test(
         "@litert//litert/c:litert_tensor_buffer",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 
@@ -136,7 +136,7 @@ cc_library(
     hdrs = ["tensor_buffer_util.h"],
     deps = [
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 

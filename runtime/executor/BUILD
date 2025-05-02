@@ -34,7 +34,7 @@ cc_library(
         "@litert//litert/cc:litert_buffer_ref",
         "@litert//litert/cc:litert_expected",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
         "//runtime/util:external_file_cc_proto",
         "//runtime/util:litert_status_util",
         "//runtime/util:model_asset_bundle_resources",
@@ -59,12 +59,13 @@ cc_library(
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
         "@litert//litert/c:litert_common",
-        "@litert//litert/cc:litert_compiled_model",
-        "@litert//litert/cc:litert_environment",
+        "@litert//litert/cc:litert_compiled_model",  # copybara:comment_replace "@litert//litert/cc/internal:litert_compiled_model",
+        "@litert//litert/cc:litert_environment",  # copybara:comment_replace "@litert//litert/cc/internal:litert_environment",
         "@litert//litert/cc:litert_expected",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_options",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
+        "@litert//litert/cc:litert_options",  # copybara:comment_replace "@litert//litert/cc/internal:litert_options",
+
         "//runtime/components:sampler",
         "//runtime/components:sampler_factory",
         "//runtime/util:convert_tensor_buffer",
@@ -146,7 +147,7 @@ cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 
@@ -182,7 +183,7 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
         "//runtime/util:logging_tensor_buffer",
     ],
 )
@@ -198,6 +199,6 @@ cc_test(
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
-        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
