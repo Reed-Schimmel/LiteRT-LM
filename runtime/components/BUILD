@@ -30,7 +30,7 @@ cc_library(
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
+        "@litert//litert/cc/internal:litert_tensor_buffer",
         "//runtime/util:convert_tensor_buffer",
     ],
 )
@@ -53,7 +53,7 @@ cc_library(
     hdrs = ["sampler.h"],
     deps = [
         "@com_google_absl//absl/status",
-        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
+        "@litert//litert/cc/internal:litert_tensor_buffer",
     ],
 )
 
@@ -135,7 +135,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
+        "@litert//litert/cc/internal:litert_tensor_buffer",
         "//runtime/util:convert_tensor_buffer",
         "//runtime/util:tensor_buffer_util",
     ],
@@ -148,7 +148,7 @@ cc_test(
         ":top_p_cpu_sampler",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/cc:litert_tensor_buffer",  # copybara:comment_replace "@litert//litert/cc/internal:litert_tensor_buffer",
+        "@litert//litert/cc/internal:litert_tensor_buffer",
         "//runtime/util:convert_tensor_buffer",
     ],
 )
@@ -164,7 +164,7 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@litert//litert/cc:litert_environment",  # copybara:comment_replace "@litert//litert/cc/internal:litert_environment",
+        "@litert//litert/cc/internal:litert_environment",
         "//runtime/executor:llm_executor_settings",
         "//runtime/proto:sampler_params_cc_proto",
     ],

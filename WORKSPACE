@@ -204,9 +204,9 @@ http_archive(
 
 http_archive(
     name = "litert",
-    sha256 = "d3260b728e506e6ea0768c3710a6592c0a1e7c560c235cd897e4e4fc7d050787",
-    strip_prefix = "LiteRT-7cb0d4a2b82b90806316cf10c2f11a46abfed694",
-    url = "https://github.com/google-ai-edge/LiteRT/archive/7cb0d4a2b82b90806316cf10c2f11a46abfed694.tar.gz",  # 2025-05-02
+    sha256 = "de4ca19a4f800f18d5954347c750c15fd3acc70c191e7a99fa9d32676a8c8f44",
+    strip_prefix = "LiteRT-83ab42d90df001971476b587bec0f5f0e75fbbce",
+    url = "https://github.com/google-ai-edge/LiteRT/archive/83ab42d90df001971476b587bec0f5f0e75fbbce.tar.gz",  # 2025-05-02
 )
 
 # Android rules. Need latest rules_android_ndk to use NDK 26+.
