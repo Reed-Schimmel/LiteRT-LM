@@ -19,26 +19,6 @@
 #include "runtime/proto/sampler_params.pb.h"
 #include "tensorflow/lite/profiling/time.h"  // from @org_tensorflow
 
-#ifndef __ANDROID__
-// Float CPU models.
-constexpr char kModelPathLlm[] = "gemma3_npu_f32_ekv1280.tflite";
-constexpr char kModelPathTokenizer[] = "gemma3_tokenizer.spiece";
-constexpr char kModelPathEmbedder[] = "gemma3_npu_embedder.tflite";
-constexpr char kModelPathAuxiliary[] = "gemma3_npu_auxiliary.tflite";
-#else
-// Quantized CPU model (as in, not AOT compiled for NPU).
-// constexpr char kModelPathLlm[] =
-//     "static_a16w4-float-rms-gelu_quantized_gemma3_npu_f32_ekv1280.tflite";
-
-// Quantized AOT compiled NPU model, optimized for sm8650.
-constexpr char kModelPathLlm[] =
-    "static_a16w4-full-int_quantized_gemma3_npu_f32_ekv1280_sm8750.tflite";
-
-constexpr char kModelPathTokenizer[] = "gemma3_tokenizer.spiece";
-constexpr char kModelPathEmbedder[] = "gemma3_npu_embedder.tflite";
-constexpr char kModelPathAuxiliary[] = "gemma3_npu_auxiliary.tflite";
-#endif
-
 ABSL_FLAG(std::string, gemma3_path, "", "Path to the Gemma3 model.");
 ABSL_FLAG(std::string, embedder_path, "", "Path to the embedder model.");
 ABSL_FLAG(std::string, auxiliary_path, "", "Path to the auxiliary model.");
@@ -46,6 +26,23 @@ ABSL_FLAG(std::string, tokenizer_path, "", "Path to the tokenizer model.");
 ABSL_FLAG(std::string, litert_dispatch_lib_path, "",
           "Path to the LiteRT dispatch library.");
 ABSL_FLAG(std::string, prompt, "", "Prompt to run.");
+ABSL_FLAG(bool, gemma_only_quantized, true,
+          "If only Gemma3 is quantized. If false, all models except embedder "
+          "are quantized (*except the embedder for now).");
+
+using odml::infra::LlmLiteRtNpuCompiledModelExecutor::ModelQuantization::
+    kAllQuantized;
+using odml::infra::LlmLiteRtNpuCompiledModelExecutor::ModelQuantization::
+    kGemmaOnlyQuantized;
+
+odml::infra::LlmLiteRtNpuCompiledModelExecutor::ModelQuantization
+GetQuantizationSchema() {
+  if (absl::GetFlag(FLAGS_gemma_only_quantized)) {
+    return kGemmaOnlyQuantized;
+  } else {
+    return kAllQuantized;
+  }
+}
 
 int main(int argc, char* argv[]) {
   absl::ParseCommandLine(argc, argv);
@@ -65,8 +62,8 @@ int main(int argc, char* argv[]) {
   uint64_t start = tflite::profiling::time::NowMicros();
   ABSL_LOG(INFO) << "Creating executor";
   auto executor_or = odml::infra::LlmLiteRtNpuCompiledModelExecutor::Create(
-      absl::GetFlag(FLAGS_gemma3_path), absl::GetFlag(FLAGS_embedder_path),
-      absl::GetFlag(FLAGS_auxiliary_path),
+      GetQuantizationSchema(), absl::GetFlag(FLAGS_gemma3_path),
+      absl::GetFlag(FLAGS_embedder_path), absl::GetFlag(FLAGS_auxiliary_path),
       absl::GetFlag(FLAGS_litert_dispatch_lib_path));
   uint64_t end = tflite::profiling::time::NowMicros();
   ABSL_LOG(INFO) << "executor creation took " << (end - start) << " us";
