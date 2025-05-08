@@ -62,12 +62,12 @@ absl::StatusOr<std::unique_ptr<LlmExecutor>> BuildExecutor(
   if (engine_settings.GetMainExecutorSettings().GetBackend() == Backend::CPU) {
     ASSIGN_OR_RETURN(executor, oi::LlmLiteRTXnnpackExecutor::Create(
                                    engine_settings.GetMainExecutorSettings(),
-                                   *model_resources->model));
+                                   *model_resources));
   } else if (engine_settings.GetMainExecutorSettings().GetBackend() ==
              Backend::GPU) {
     ASSIGN_OR_RETURN(executor, oi::LlmLiteRTOpenClExecutor::Create(
                                    engine_settings.GetMainExecutorSettings(),
-                                   *model_resources->model));
+                                   *model_resources));
   } else {
     return absl::InvalidArgumentError(
         absl::StrCat("Unsupported backend: ",
