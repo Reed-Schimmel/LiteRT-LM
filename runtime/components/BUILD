@@ -120,6 +120,31 @@ cc_test(
 )
 
 cc_library(
+    name = "stop_token_detector",
+    srcs = ["stop_token_detector.cc"],
+    hdrs = ["stop_token_detector.h"],
+    deps = [
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "stop_token_detector_test",
+    srcs = ["stop_token_detector_test.cc"],
+    deps = [
+        ":stop_token_detector",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:span",
+        "//runtime/util:test_utils",
+    ],
+)
+
+cc_library(
     name = "token_id_util",
     srcs = ["token_id_util.cc"],
     hdrs = ["token_id_util.h"],
