@@ -54,6 +54,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "//third_party/flatbuffers",
+        "//runtime/proto:llm_metadata_cc_proto",
         "@sentencepiece//:sentencepiece_processor",
         "@org_tensorflow//tensorflow/lite:framework",
         "@org_tensorflow//tensorflow/lite/schema:schema_fbs",
@@ -73,6 +74,7 @@ cc_test(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//third_party/flatbuffers",
+        "//runtime/proto:llm_metadata_cc_proto",
         "@sentencepiece//:sentencepiece_processor",
         "@org_tensorflow//tensorflow/lite:framework",
         "@org_tensorflow//tensorflow/lite:framework_stable",
@@ -137,6 +139,7 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "//runtime/proto:llm_metadata_cc_proto",
     ],
 )
 
@@ -197,5 +200,6 @@ cc_test(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//third_party/flatbuffers",
+        "//runtime/proto:llm_metadata_cc_proto",
     ],
 )

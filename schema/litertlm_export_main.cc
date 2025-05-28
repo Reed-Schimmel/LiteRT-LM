@@ -7,13 +7,13 @@
 // //third_party/odml/litert_lm/schema:litertlm_export_main \
 //   -- --tokenizer_file=/path/to/tokenizer.model \
 //   --tflite_file=/path/to/model.tflite \
-//   --llm_params=/path/to/llm_params.pb
+//   --llm_metadata=/path/to/llm_metadata.pb
 //   --output_path=/path/to/output.litertlm \
 //   --section_metadata="tokenizer:key1=value1,key2=value2;\
-//     tflite:key3=123,key4=true:llm_params=key5=abc"
+//     tflite:key3=123,key4=true:llm_metadata=key5=abc"
 //
-// (Also accepts `--llm_params_text' instead if text proto is preferred)
-//  (or --llm_params_text for a text proto) \
+// (Also accepts `--llm_metadata_text' instead if text proto is preferred)
+//  (or --llm_metadata_text for a text proto) \
 // NB: This tool is deprecated and will be replaced with litertlm-writer.
 
 #include <cstdint>
@@ -35,6 +35,7 @@
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/str_split.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
+#include "runtime/proto/llm_metadata.pb.h"
 #include "schema/core/litertlm_export.h"
 #include "schema/core/litertlm_header.h"
 #include "schema/core/litertlm_header_schema_generated.h"
@@ -44,7 +45,7 @@
 // Section names used in the section_metadata flag.
 constexpr char kTokenizerSectionName[] = "tokenizer";
 constexpr char kTfliteSectionName[] = "tflite";
-constexpr char kLlmParamsSectionName[] = "llm_params";
+constexpr char kLlmMetadataSectionName[] = "llm_metadata";
 
 ABSL_FLAG(std::string, tokenizer_file, "",
           "The path to the file that contains the SP tokenizer.");
@@ -52,11 +53,11 @@ ABSL_FLAG(std::string, tokenizer_file, "",
 ABSL_FLAG(std::string, tflite_file, "", "The path to the TFLite model file.");
 
 ABSL_FLAG(
-    std::string, llm_params, "",
-    "The path to the file containing the LlmParameters proto (binary format).");
+    std::string, llm_metadata, "",
+    "The path to the file containing the LlmMetadata proto (binary format).");
 
-ABSL_FLAG(std::string, llm_params_text, "",
-          "The path to the file containing the LlmParameters text proto.");
+ABSL_FLAG(std::string, llm_metadata_text, "",
+          "The path to the file containing the LlmMetadata text proto.");
 
 ABSL_FLAG(std::string, output_path, "",
           "The path for the output LiteRT-LM file.");
@@ -73,7 +74,7 @@ ABSL_FLAG(std::string, section_metadata, "",
 namespace {
 
 using ::litert::litertlm::schema::AnySectionDataType;
-using ::litert::litertlm::schema::AnySectionDataType_LlmParamsProto;
+using ::litert::litertlm::schema::AnySectionDataType_LlmMetadataProto;
 using ::litert::litertlm::schema::AnySectionDataType_SP_Tokenizer;
 using ::litert::litertlm::schema::AnySectionDataType_TFLiteModel;
 using ::litert::litertlm::schema::CreateKeyValuePair;
@@ -83,7 +84,7 @@ using ::litert::litertlm::schema::KVPair;
 using ::litert::litertlm::schema::MakeLiteRTLMFromSections;
 using ::litert::litertlm::schema::ProtoBufSectionStream;
 using ::litert::litertlm::schema::SectionStreamBase;
-using ::odml::infra::proto::LlmParameters;
+using ::litert::lm::proto::LlmMetadata;
 
 // Helper function to parse a single key-value pair.
 absl::Status ParseKeyValuePair(absl::string_view kv_str, std::string& key,
@@ -133,29 +134,31 @@ absl::Status MainHelper(int argc, char** argv) {
   std::string tokenizer_file = absl::GetFlag(FLAGS_tokenizer_file);
   std::string tflite_file = absl::GetFlag(FLAGS_tflite_file);
   std::string output_path = absl::GetFlag(FLAGS_output_path);
-  std::string llm_params_file = absl::GetFlag(FLAGS_llm_params);
-  std::string llm_params_text_file = absl::GetFlag(FLAGS_llm_params_text);
+  std::string llm_metadata_file = absl::GetFlag(FLAGS_llm_metadata);
+  std::string llm_metadata_text_file = absl::GetFlag(FLAGS_llm_metadata_text);
   std::string section_metadata_str = absl::GetFlag(FLAGS_section_metadata);
 
   ABSL_LOG(INFO) << "tokenizer file is " << tokenizer_file << "\n";
   ABSL_LOG(INFO) << "tflite file is " << tflite_file << "\n";
   ABSL_LOG(INFO) << "output_path is " << output_path << "\n";
-  ABSL_LOG(INFO) << "llm_params file is " << llm_params_file << "\n";
-  ABSL_LOG(INFO) << "llm_params_text file is " << llm_params_text_file << "\n";
+  ABSL_LOG(INFO) << "llm_metadata file is " << llm_metadata_file << "\n";
+  ABSL_LOG(INFO) << "llm_metadata_text file is " << llm_metadata_text_file
+                 << "\n";
   ABSL_LOG(INFO) << "section_metadata is " << section_metadata_str << "\n";
 
   // Enforce that at least one input file flag is specified.
   if (tokenizer_file.empty() && tflite_file.empty() &&
-      llm_params_file.empty() && llm_params_text_file.empty()) {
+      llm_metadata_file.empty() && llm_metadata_text_file.empty()) {
     return absl::InvalidArgumentError(
-        "At least one of --tokenizer_file, --tflite_file, --llm_params, or "
-        "--llm_params_text must be provided.");
+        "At least one of --tokenizer_file, --tflite_file, --llm_metadata, or "
+        "--llm_metadata_text must be provided.");
   }
 
-  // Enforce that only one of --llm_params or --llm_params_text is specified.
-  if (!llm_params_file.empty() && !llm_params_text_file.empty()) {
+  // Enforce that only one of --llm_metadata or --llm_metadata_text is
+  // specified.
+  if (!llm_metadata_file.empty() && !llm_metadata_text_file.empty()) {
     return absl::InvalidArgumentError(
-        "Only one of --llm_params or --llm_params_text can be specified.");
+        "Only one of --llm_metadata or --llm_metadata_text can be specified.");
   }
 
   std::vector<std::unique_ptr<SectionStreamBase>> sections;
@@ -181,46 +184,46 @@ absl::Status MainHelper(int argc, char** argv) {
         {});  // Add an empty vector, to be populated later
   }
 
-  if (!llm_params_file.empty() || !llm_params_text_file.empty()) {
-    LlmParameters llm_params_proto;
+  if (!llm_metadata_file.empty() || !llm_metadata_text_file.empty()) {
+    LlmMetadata llm_metadata_proto;
 
-    if (!llm_params_file.empty()) {
+    if (!llm_metadata_file.empty()) {
       // Read binary proto from file.
-      std::ifstream ifs(llm_params_file);
+      std::ifstream ifs(llm_metadata_file);
       if (!ifs.is_open()) {
-        return absl::NotFoundError(
-            absl::StrCat("Could not open llm_params file: ", llm_params_file));
+        return absl::NotFoundError(absl::StrCat(
+            "Could not open llm_metadata file: ", llm_metadata_file));
       }
       std::string proto_str((std::istreambuf_iterator<char>(ifs)),
                             std::istreambuf_iterator<char>());
 
-      if (!llm_params_proto.ParseFromString(proto_str)) {
+      if (!llm_metadata_proto.ParseFromString(proto_str)) {
         return absl::InvalidArgumentError(
-            "Failed to parse LlmParameters protobuf from binary file.");
+            "Failed to parse LlmMetadata protobuf from binary file.");
       }
-    } else {  // llm_params_text_file is not empty
+    } else {  // llm_metadata_text_file is not empty
               // Read text proto from file.
-      std::ifstream ifs(llm_params_text_file);
+      std::ifstream ifs(llm_metadata_text_file);
       if (!ifs.is_open()) {
         return absl::NotFoundError(absl::StrCat(
-            "Could not open llm_params text file: ", llm_params_text_file));
+            "Could not open llm_metadata text file: ", llm_metadata_text_file));
       }
       std::string proto_text_str((std::istreambuf_iterator<char>(ifs)),
                                  std::istreambuf_iterator<char>());
 
       if (!proto2::TextFormat::ParseFromString(proto_text_str,
-                                               &llm_params_proto)) {
+                                               &llm_metadata_proto)) {
         return absl::InvalidArgumentError(
-            "Failed to parse LlmParameters protobuf from text file.");
+            "Failed to parse LlmMetadata protobuf from text file.");
       }
     }
 
     // Create a ProtoBufSectionStream with the parsed proto.
     std::unique_ptr<SectionStreamBase> pbs =
-        std::make_unique<ProtoBufSectionStream<LlmParameters>>(
-            llm_params_proto);
+        std::make_unique<ProtoBufSectionStream<LlmMetadata>>(
+            llm_metadata_proto);
     sections.push_back(std::move(pbs));
-    section_types.push_back(AnySectionDataType_LlmParamsProto);
+    section_types.push_back(AnySectionDataType_LlmMetadataProto);
     section_items_list.push_back(
         {});  // Add an empty vector, to be populated later
   }
@@ -259,7 +262,7 @@ absl::Status MainHelper(int argc, char** argv) {
 
   // Assign parsed metadata to the correct section_items_list entries.
   // This logic assumes the order of sections matches the order of
-  // tokenizer_file, tflite_file, and llm_params_file processing.
+  // tokenizer_file, tflite_file, and llm_metadata_file processing.
   int section_index = 0;
   if (!tokenizer_file.empty() &&
       section_metadata_map.count(kTokenizerSectionName)) {
@@ -272,11 +275,11 @@ absl::Status MainHelper(int argc, char** argv) {
         section_metadata_map[kTfliteSectionName];
     ++section_index;
   }
-  // Check for either llm_params or llm_params_text
-  if ((!llm_params_file.empty() || !llm_params_text_file.empty()) &&
-      section_metadata_map.count(kLlmParamsSectionName)) {
+  // Check for either llm_metadata or llm_metadata_text
+  if ((!llm_metadata_file.empty() || !llm_metadata_text_file.empty()) &&
+      section_metadata_map.count(kLlmMetadataSectionName)) {
     section_items_list[section_index] =
-        section_metadata_map[kLlmParamsSectionName];
+        section_metadata_map[kLlmMetadataSectionName];
     ++section_index;
   }
   std::vector<KVPair> system_meta = {

@@ -69,7 +69,7 @@ enum AnySectionDataType: ubyte {
   Deprecated, // For edited files with outdated sections.
   TFLiteModel, // Corresponds to a tflite.Model.
   SP_Tokenizer, // A SentencePiece Tokenizer.
-  LlmParamsProto, // An odml.infra.genai.inference.proto.llm_params Protobuf.
+  LlmMetadataProto, // An odml.infra.genai.inference.proto.llm_metadata Protobuf.
 }
 
 // Section offsets and datatype

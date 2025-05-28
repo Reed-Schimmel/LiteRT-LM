@@ -18,8 +18,8 @@ std::string AnySectionDataTypeToString(AnySectionDataType value) {
       return "AnySectionDataType_TFLiteModel";
     case AnySectionDataType_SP_Tokenizer:
       return "AnySectionDataType_SP_Tokenizer";
-    case AnySectionDataType_LlmParamsProto:
-      return "AnySectionDataType_LlmParamsProto";
+    case AnySectionDataType_LlmMetadataProto:
+      return "AnySectionDataType_LlmMetadataProto";
     case AnySectionDataType_GenericBinaryData:
       return "AnySectionDataType_GenericBinaryData";
     default:

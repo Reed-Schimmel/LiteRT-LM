@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 #include "absl/status/status.h"  // from @com_google_absl
+#include "runtime/proto/llm_metadata.pb.h"
 #include "schema/core/litertlm_header_schema_generated.h"
 #include "sentencepiece_processor.h"  // from @sentencepiece
 #include "tensorflow/lite/model_builder.h"  // from @org_tensorflow
@@ -69,15 +70,14 @@ TEST(LiteRTLMReadTest, TokenizerRead) {
   ASSERT_TRUE(result.ok());
 }
 
-TEST(LiteRTLMReadTest, LlmParamsRead) {
-  using odml::infra::proto::LlmParameters;
+TEST(LiteRTLMReadTest, LlmMetadataRead) {
+  using litert::lm::proto::LlmMetadata;
   const std::string input_filename =
       std::filesystem::path(::testing::SrcDir()) /
       "litert_lm/schema/testdata/test_tok_tfl_llm.litertlm";
 
-  LlmParameters params;
-  absl::Status result =
-      ReadLlmParametersFromSection(input_filename, 2, &params);
+  LlmMetadata params;
+  absl::Status result = ReadLlmMetadataFromSection(input_filename, 2, &params);
   ASSERT_TRUE(result.ok());
 }
 

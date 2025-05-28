@@ -11,7 +11,7 @@ Remake test_tok_tfl_llm.litertlm
 blaze run -c opt //third_party/odml/litert_lm/schema:litertlm_export_main -- \
  --tokenizer_file=$PWD/testdata//gemma3_tokenizer.spiece \
  --tflite_file=$PWD/testdata/attention.tflite \
- --llm_params=$PWD/testdata/llm_params.pb \
+ --llm_metadata=$PWD/testdata/llm_metadata.pb \
  --output_path=$PWD/testdata/test_tok_tfl_llm.litertlm \
- --section_metadata="tokenizer:vocab_size=10000,algorithm=bpe;tflite:quantized=true,model_size=1234567;llm_params:model=gemma3"
+ --section_metadata="tokenizer:vocab_size=10000,algorithm=bpe;tflite:quantized=true,model_size=1234567;llm_metadata:model=gemma3"
 

@@ -14,6 +14,7 @@
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "runtime/proto/llm_metadata.pb.h"  // For LlmMetadata
 #include "schema/core/litertlm_print.h"
 #include "schema/litertlm_writer_utils.h"
 #include "google/protobuf/text_format.h"  // from @com_google_protobuf  // For TextFormat::PrintToString
@@ -86,7 +87,7 @@ TEST_F(LiteRTLMWriteTest, BasicFileCreationAndValidation) {
   // 1. Define paths for temporary input files and the output file.
   const std::string tokenizer_path = temp_dir_path_ + "/tokenizer.spiece";
   const std::string tflite_model_path = temp_dir_path_ + "/model.tflite";
-  const std::string llm_params_path = temp_dir_path_ + "/llm_params.pbtext";
+  const std::string llm_metadata_path = temp_dir_path_ + "/llm_metadata.pbtext";
   const std::string output_litertlm_path = temp_dir_path_ + "/output.litertlm";
 
   // 2. Create dummy input files.
@@ -94,28 +95,28 @@ TEST_F(LiteRTLMWriteTest, BasicFileCreationAndValidation) {
   CreateDummyFile(tflite_model_path,
                   "Dummy TFLite Model Content. Not a real model.");
 
-  odml::infra::proto::LlmParameters params_proto;
+  litert::lm::proto::LlmMetadata metadata;
   const std::string start_token = "<start>";
   const std::vector<std::string> stop_tokens = {"<stop>", "<eos>"};
-  params_proto.set_start_token(start_token);
+  metadata.mutable_start_token()->set_token_str(start_token);
 
   // Set the stop_tokens
   for (const std::string& stop_token : stop_tokens) {
-    params_proto.add_stop_tokens(stop_token);
+    metadata.add_stop_tokens()->set_token_str(stop_token);
   }
 
   std::string params_pbtext_content;
   ASSERT_TRUE(
-      proto2::TextFormat::PrintToString(params_proto, &params_pbtext_content));
-  CreateDummyFile(llm_params_path, params_pbtext_content);
+      proto2::TextFormat::PrintToString(metadata, &params_pbtext_content));
+  CreateDummyFile(llm_metadata_path, params_pbtext_content);
 
   // 3. Prepare arguments for LitertLmWrite.
   const std::vector<std::string> command_args = {
-      tokenizer_path, tflite_model_path, llm_params_path};
+      tokenizer_path, tflite_model_path, llm_metadata_path};
   const std::string section_metadata_str =
       "tokenizer:tok_version=1.2,lang=en;"
       "tflite:model_size=2048,quantized=false;"
-      "llm_params:author=TestyMcTestface,temperature=0.8";
+      "llm_metadata:author=TestyMcTestface,temperature=0.8";
 
   // 4. Call LitertLmWrite.
   const absl::Status result =
@@ -144,7 +145,7 @@ TEST_F(LiteRTLMWriteTest, BasicFileCreationAndValidation) {
   EXPECT_THAT(inspection_str,
               testing::HasSubstr("AnySectionDataType_TFLiteModel"));
   EXPECT_THAT(inspection_str,
-              testing::HasSubstr("AnySectionDataType_LlmParamsProto"));
+              testing::HasSubstr("AnySectionDataType_LlmMetadataProto"));
 
   // Check for presence of metadata (adjust based on ProcessLiteRTLMFile's
   // output format). Assuming ProcessLiteRTLMFile prints metadata like "key:
@@ -275,7 +276,7 @@ TEST_F(LiteRTLMWriteTest, NonExistentInputFileTest) {
   ASSERT_FALSE(result.ok());
   // Error message depends on which file type fails first during parsing.
   // For .spiece (FileBackedSectionStream): "Failed to open file"
-  // For .pbtext (std::ifstream): "Could not open llm_params text file"
+  // For .pbtext (std::ifstream): "Could not open llm_metadata text file"
   EXPECT_THAT(
       std::string(result.message()),
       testing::AnyOf(

@@ -25,7 +25,7 @@ TEST(LiteRTLMPrintTest, ProcessLiteRTLMFileTest) {
             std::string::npos);
   ASSERT_NE(output_ss.str().find("AnySectionDataType_SP_Tokenizer"),
             std::string::npos);
-  ASSERT_NE(output_ss.str().find("AnySectionDataType_LlmParamsProto"),
+  ASSERT_NE(output_ss.str().find("AnySectionDataType_LlmMetadataProto"),
             std::string::npos);
 }
 

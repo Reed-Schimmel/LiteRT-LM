@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "absl/status/status.h"  // from @com_google_absl
+#include "runtime/proto/llm_metadata.pb.h"
 #include "schema/core/litertlm_header.h"
 #include "schema/core/litertlm_header_schema_generated.h"
 #include "schema/core/litertlm_utils.h"
@@ -21,7 +22,7 @@ namespace litertlm {
 
 namespace schema {
 
-using odml::infra::proto::LlmParameters;
+using litert::lm::proto::LlmMetadata;
 
 struct LitertlmHeader {
   std::unique_ptr<uint8_t[]> buffer;
@@ -129,16 +130,16 @@ absl::Status ReadAnyTFLite(
     const std::string& litertlm_path,
     std::unique_ptr<tflite::FlatBufferModel>* tflite_model);
 
-// Read a LlmParameters from the specified section in the LiteRT-LM file.
-// Returns InvalidArgumentError if no LlmParameters are found in that section.
-absl::Status ReadLlmParametersFromSection(const std::string& litertlm_path,
-                                          int section_idx,
-                                          LlmParameters* llm_params);
+// Read a LlmMetadata from the specified section in the LiteRT-LM file.
+// Returns InvalidArgumentError if no LlmMetadata are found in that section.
+absl::Status ReadLlmMetadataFromSection(const std::string& litertlm_path,
+                                        int section_idx,
+                                        LlmMetadata* llm_metadata);
 
-// Read any LlmParameters from the file (convenience function if the caller
-// knows that only 1 LlmParameters proto exists in the LiteRT-LM file).
-absl::Status ReadAnyLlmParameters(const std::string& litertlm_path,
-                                  LlmParameters* llm_params);
+// Read any LlmMetadata from the file (convenience function if the caller
+// knows that only 1 LlmMetadata proto exists in the LiteRT-LM file).
+absl::Status ReadAnyLlmMetadata(const std::string& litertlm_path,
+                                LlmMetadata* llm_metadata);
 
 // Read a SP Tokenizer from the specified section in the LiteRT-LM file.
 // Returns InvalidArgumentError if no SP Tokenizer is found in that section.

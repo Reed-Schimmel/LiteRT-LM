@@ -22,7 +22,7 @@ namespace litert {
 namespace litertlm {
 namespace schema {
 
-using odml::infra::proto::LlmParameters;
+using litert::lm::proto::LlmMetadata;
 
 absl::Status ReadHeaderFromLiteRTLM(std::istream& litertlm_stream,
                                     LitertlmHeader* header, int* major_version,
@@ -204,11 +204,11 @@ absl::Status ReadSectionIntoTFLite(
   return absl::OkStatus();
 }
 
-// Function to read LlmParameters from a section.
-absl::Status ReadSectionIntoLlmParameters(std::ifstream& input_stream,
-                                          uint64_t begin_offset,
-                                          uint64_t end_offset,
-                                          LlmParameters* llm_params) {
+// Function to read LlmMetadata from a section.
+absl::Status ReadSectionIntoLlmMetadata(std::ifstream& input_stream,
+                                        uint64_t begin_offset,
+                                        uint64_t end_offset,
+                                        LlmMetadata* llm_metadata) {
   size_t size = end_offset - begin_offset;
   std::unique_ptr<char[]> buffer(new char[size]);
   input_stream.read(buffer.get(), size);
@@ -216,7 +216,7 @@ absl::Status ReadSectionIntoLlmParameters(std::ifstream& input_stream,
     return absl::InternalError(
         absl::StrFormat("Could not read %d bytes from stream.", size));
   }
-  llm_params->ParseFromArray(buffer.get(), size);
+  llm_metadata->ParseFromArray(buffer.get(), size);
   return absl::OkStatus();
 }
 
@@ -243,12 +243,12 @@ absl::Status ReadTFLiteFromSection(
       litertlm_path, section_idx, tflite_model, ReadSectionIntoTFLite);
 }
 
-absl::Status ReadLlmParametersFromSection(const std::string& litertlm_path,
-                                          int section_idx,
-                                          LlmParameters* llm_params) {
-  return ReadValueTFromSection<AnySectionDataType_LlmParamsProto,
-                               LlmParameters>(
-      litertlm_path, section_idx, llm_params, ReadSectionIntoLlmParameters);
+absl::Status ReadLlmMetadataFromSection(const std::string& litertlm_path,
+                                        int section_idx,
+                                        LlmMetadata* llm_metadata) {
+  return ReadValueTFromSection<AnySectionDataType_LlmMetadataProto,
+                               LlmMetadata>(
+      litertlm_path, section_idx, llm_metadata, ReadSectionIntoLlmMetadata);
 }
 
 absl::Status ReadSPTokenizerFromSection(
@@ -298,14 +298,14 @@ absl::Status ReadAnyTFLite(
       litertlm_path, tflite_model, ReadTFLiteFromSection);
 }
 
-// Instantiation of ReadAnyT for LlmParameters.
-absl::Status ReadAnyLlmParameters(const std::string& litertlm_path,
-                                  LlmParameters* llm_params) {
-  return ReadAnyT<AnySectionDataType_LlmParamsProto, LlmParameters>(
-      litertlm_path, llm_params, ReadLlmParametersFromSection);
+// Instantiation of ReadAnyT for LlmMetadata.
+absl::Status ReadAnyLlmMetadata(const std::string& litertlm_path,
+                                LlmMetadata* llm_metadata) {
+  return ReadAnyT<AnySectionDataType_LlmMetadataProto, LlmMetadata>(
+      litertlm_path, llm_metadata, ReadLlmMetadataFromSection);
 }
 
-// Instantiation of ReadAnyT for LlmParameters.
+// Instantiation of ReadAnyT for LlmMetadata.
 absl::Status ReadAnySPTokenizer(
     const std::string& litertlm_path,
     sentencepiece::SentencePieceProcessor* sp_proc) {

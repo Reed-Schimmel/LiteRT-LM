@@ -8,10 +8,10 @@
 //   -- --output_path=/path/to/output.litertlm \
 //   /path/to/tokenizer.spiece \
 //   /path/to/model.tflite \
-//   /path/to/llm_params.pbtext \ (or binary proto via .pb or .proto)
+//   /path/to/llm_metadata.pbtext \ (or binary proto via .pb or .proto)
 //   /path/to/model2.tflite \
 //   --section_metadata="tokenizer:key1=value1,key2=value2;\
-//     tflite:key3=123,key4=true;llm_params:key5=abc;tflite:z=9.8"
+//     tflite:key3=123,key4=true;llm_metadata:key5=abc;tflite:z=9.8"
 
 #include <cstddef>
 #include <cstdint>
@@ -34,6 +34,7 @@
 #include "absl/strings/str_split.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffer_builder.h"
+#include "runtime/proto/llm_metadata.pb.h"
 #include "schema/litertlm_writer_utils.h"
 #include "google/protobuf/text_format.h"  // from @com_google_protobuf
 

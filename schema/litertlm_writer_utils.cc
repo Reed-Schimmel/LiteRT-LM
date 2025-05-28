@@ -18,6 +18,7 @@
 #include "absl/strings/str_split.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffer_builder.h"
+#include "runtime/proto/llm_metadata.pb.h"
 #include "schema/core/litertlm_export.h"
 #include "schema/core/litertlm_header.h"
 #include "schema/core/litertlm_header_schema_generated.h"
@@ -29,9 +30,9 @@ namespace litert::litertlm::schema {
 // Section names used in the section_metadata flag.
 constexpr char kTokenizerSectionName[] = "tokenizer";
 constexpr char kTfliteSectionName[] = "tflite";
-constexpr char kLlmParamsSectionName[] = "llm_params";
+constexpr char kLlmMetadataSectionName[] = "llm_metadata";
 
-using ::odml::infra::proto::LlmParameters;
+using ::litert::lm::proto::LlmMetadata;
 
 // Helper function to parse a single key-value pair.
 absl::Status ParseKeyValuePair(absl::string_view kv_str, std::string& key,
@@ -108,42 +109,41 @@ absl::Status LitertLmWrite(const std::vector<std::string>& command_args,
       section_types.push_back(AnySectionDataType_TFLiteModel);
       section_name_order.push_back(kTfliteSectionName);
     } else if (extension == ".pb" || extension == ".proto") {
-      LlmParameters llm_params_proto;
+      LlmMetadata llm_metadata_proto;
       std::ifstream ifs(filename, std::ios::binary);
       if (!ifs.is_open()) {
-        return absl::NotFoundError(
-            absl::StrCat("Could not open llm_params binary file: ", filename));
+        return absl::NotFoundError(absl::StrCat(
+            "Could not open llm_metadata binary file: ", filename));
       }
       std::string proto_str((std::istreambuf_iterator<char>(ifs)),
                             std::istreambuf_iterator<char>());
-      if (!llm_params_proto.ParseFromString(proto_str)) {
+      if (!llm_metadata_proto.ParseFromString(proto_str)) {
         return absl::InvalidArgumentError(absl::StrCat(
-            "Failed to parse LlmParameters protobuf from binary file: ",
+            "Failed to parse LlmMetadata protobuf from binary file: ",
             filename));
       }
-      sections.push_back(std::make_unique<ProtoBufSectionStream<LlmParameters>>(
-          llm_params_proto));
-      section_types.push_back(AnySectionDataType_LlmParamsProto);
-      section_name_order.push_back(kLlmParamsSectionName);
+      sections.push_back(std::make_unique<ProtoBufSectionStream<LlmMetadata>>(
+          llm_metadata_proto));
+      section_types.push_back(AnySectionDataType_LlmMetadataProto);
+      section_name_order.push_back(kLlmMetadataSectionName);
     } else if (extension == ".pbtext" || extension == ".prototext") {
-      LlmParameters llm_params_proto;
+      LlmMetadata llm_metadata_proto;
       std::ifstream ifs(filename);
       if (!ifs.is_open()) {
         return absl::NotFoundError(
-            absl::StrCat("Could not open llm_params text file: ", filename));
+            absl::StrCat("Could not open llm_metadata text file: ", filename));
       }
       std::string proto_text_str((std::istreambuf_iterator<char>(ifs)),
                                  std::istreambuf_iterator<char>());
       if (!proto2::TextFormat::ParseFromString(proto_text_str,
-                                               &llm_params_proto)) {
+                                               &llm_metadata_proto)) {
         return absl::InvalidArgumentError(absl::StrCat(
-            "Failed to parse LlmParameters protobuf from text file: ",
-            filename));
+            "Failed to parse LlmMetadata protobuf from text file: ", filename));
       }
-      sections.push_back(std::make_unique<ProtoBufSectionStream<LlmParameters>>(
-          llm_params_proto));
-      section_types.push_back(AnySectionDataType_LlmParamsProto);
-      section_name_order.push_back(kLlmParamsSectionName);
+      sections.push_back(std::make_unique<ProtoBufSectionStream<LlmMetadata>>(
+          llm_metadata_proto));
+      section_types.push_back(AnySectionDataType_LlmMetadataProto);
+      section_name_order.push_back(kLlmMetadataSectionName);
     } else if (extension == ".spiece") {
       sections.push_back(std::make_unique<FileBackedSectionStream>(filename));
       section_types.push_back(AnySectionDataType_SP_Tokenizer);

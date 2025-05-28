@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 #include "absl/status/status.h"  // from @com_google_absl
+#include "runtime/proto/llm_metadata.pb.h"
 
 namespace litert {
 namespace litertlm {
@@ -64,45 +65,27 @@ TEST(LiteRTLMSectionTest, TestFileBackedSectionStream) {
 }
 
 TEST(LiteRTLMSectionTest, TestProtoSectionStream) {
-  using odml::infra::proto::LlmParameters;
+  using litert::lm::proto::LlmMetadata;
   using odml::infra::proto::PromptTemplate;
 
   // Constants for the Token Generation Data
   const std::string start_token = "<start>";
   const std::vector<std::string> stop_tokens = {"<stop>", "<eos>"};
+  const std::string output_filename = "/tmp/llm_metadata.pb";
 
-  bool enable_bytes_to_unicode_mapping = true;
-
-  const std::string system_prompt = "You are a helpful AI assistant.";
-  const std::string prompt_prefix = "User: ";
-  const std::string prompt_suffix = "Assistant: ";
-  const std::string output_filename = "/tmp/llm_params.pb";
-
-  // Create an LlmParameters protocol buffer
-  LlmParameters params;
+  // Create an LlmMetadata protocol buffer
+  LlmMetadata metadata;
 
   // Set the start_token
-  params.set_start_token(start_token);
+  metadata.mutable_start_token()->set_token_str(start_token);
 
   // Set the stop_tokens
   for (const std::string& stop_token : stop_tokens) {
-    params.add_stop_tokens(stop_token);
+    metadata.add_stop_tokens()->set_token_str(stop_token);
   }
-
-  // Set the input_output_normalizations based on the config flag
-  if (enable_bytes_to_unicode_mapping) {
-    params.add_input_output_normalizations(
-        LlmParameters::INPUT_OUTPUT_NORMALIZATION_BYTES_TO_UNICODE);
-  }
-
-  // Set the prompt template fields
-  PromptTemplate* prompt_template = params.mutable_prompt_template();
-  prompt_template->set_session_prefix(system_prompt);
-  prompt_template->set_prompt_prefix(prompt_prefix);
-  prompt_template->set_prompt_suffix(prompt_suffix);
 
   // ** Write the file using typical protobuf serialization **
-  std::string serialized_params = params.SerializeAsString();
+  std::string serialized_params = metadata.SerializeAsString();
   // Convert the serialized string to a vector of unsigned chars
   std::vector<unsigned char> buffer(serialized_params.begin(),
                                     serialized_params.end());
@@ -116,13 +99,13 @@ TEST(LiteRTLMSectionTest, TestProtoSectionStream) {
   output_file.close();
 
   // ** Write the file using SectionStream interface **
-  ProtoBufSectionStream<LlmParameters> pbss(params);
+  ProtoBufSectionStream<LlmMetadata> pbss(metadata);
   absl::Status result = pbss.Prepare();
   ASSERT_TRUE(result.ok());
 
   size_t pbss_size = pbss.BufferSize();
   auto& pbss_stream = pbss.GetStream();
-  const std::string output_filename_streamed = "/tmp/llm_params_streamed.pb";
+  const std::string output_filename_streamed = "/tmp/llm_metadata_streamed.pb";
   std::ofstream output_streamed(output_filename_streamed, std::ios::binary);
   ASSERT_TRUE(output_streamed.is_open());
 
@@ -139,30 +122,18 @@ TEST(LiteRTLMSectionTest, TestProtoSectionStream) {
   std::string serialized_read_back = ss.str();
   input_streamed.close();
 
-  LlmParameters params_read_back;
+  LlmMetadata params_read_back;
   ASSERT_TRUE(params_read_back.ParseFromString(serialized_read_back));
 
   // Compare the fields.
-  EXPECT_EQ(params.start_token(), params_read_back.start_token());
-  EXPECT_EQ(params.stop_tokens().size(), params_read_back.stop_tokens().size());
-  for (int i = 0; i < params.stop_tokens().size(); ++i) {
-    EXPECT_EQ(params.stop_tokens(i), params_read_back.stop_tokens(i));
+  EXPECT_EQ(metadata.start_token().token_str(),
+            params_read_back.start_token().token_str());
+  EXPECT_EQ(metadata.stop_tokens().size(),
+            params_read_back.stop_tokens().size());
+  for (int i = 0; i < metadata.stop_tokens().size(); ++i) {
+    EXPECT_EQ(metadata.stop_tokens(i).token_str(),
+              params_read_back.stop_tokens(i).token_str());
   }
-  EXPECT_EQ(params.input_output_normalizations().size(),
-            params_read_back.input_output_normalizations().size());
-  for (int i = 0; i < params.input_output_normalizations().size(); ++i) {
-    EXPECT_EQ(params.input_output_normalizations(i),
-              params_read_back.input_output_normalizations(i));
-  }
-
-  const PromptTemplate& prompt_template_read_back =
-      params_read_back.prompt_template();
-  EXPECT_EQ(params.prompt_template().session_prefix(),
-            prompt_template_read_back.session_prefix());
-  EXPECT_EQ(params.prompt_template().prompt_prefix(),
-            prompt_template_read_back.prompt_prefix());
-  EXPECT_EQ(params.prompt_template().prompt_suffix(),
-            prompt_template_read_back.prompt_suffix());
 }
 
 }  // namespace
