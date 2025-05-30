@@ -141,9 +141,8 @@ class EngineImpl : public Engine {
     ABSL_QCHECK_OK(executor_->UpdateRuntimeConfig(runtime_config));
 
     // Creating the thread pool of a single thread to execute the works.
-    worker_thread_pool_ = std::make_shared<ThreadPool>(
-        ThreadOptions(), /*name_prefix=*/"engine", /*num_threads=*/1);
-    worker_thread_pool_->StartWorkers();
+    worker_thread_pool_ = std::make_unique<ThreadPool>(/*name_prefix=*/"engine",
+                                                       /*max_num_threads=*/1);
   }
 
   // Method to create the Session.
@@ -157,7 +156,7 @@ class EngineImpl : public Engine {
     config.GetMutableSamplerParams().set_type(
         proto::SamplerParameters::TYPE_UNSPECIFIED);
     return InitializeSession(executor_, tokenizer_, config, benchmark_info_,
-                             worker_thread_pool_);
+                             worker_thread_pool_.get());
   }
 
   absl::Status WaitUntilDone(absl::Duration timeout) override {
@@ -180,7 +179,7 @@ class EngineImpl : public Engine {
   std::optional<BenchmarkInfo> benchmark_info_;
 
   // Thread pool for the engine to execute the works.
-  std::shared_ptr<ThreadPool> worker_thread_pool_;
+  std::unique_ptr<ThreadPool> worker_thread_pool_;
 };
 
 // Method to create Engine.

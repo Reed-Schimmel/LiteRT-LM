@@ -50,15 +50,14 @@ class SessionBasicTest : public testing::Test {
     sampler_params_.set_type(proto::SamplerParameters::TYPE_UNSPECIFIED);
 
     // Creating the thread pool of a single thread to execute the works.
-    worker_thread_pool_ = std::make_shared<ThreadPool>(
-        ThreadOptions(), /*name_prefix=*/"engine", /*num_threads=*/1);
-    worker_thread_pool_->StartWorkers();
+    worker_thread_pool_ = std::make_unique<ThreadPool>(/*name_prefix=*/"engine",
+                                                       /*max_num_threads=*/1);
   }
 
   std::shared_ptr<Tokenizer> tokenizer_;
   std::shared_ptr<LlmExecutor> executor_;
   proto::SamplerParameters sampler_params_;
-  std::shared_ptr<ThreadPool> worker_thread_pool_;
+  std::unique_ptr<ThreadPool> worker_thread_pool_;
 };
 
 TEST_F(SessionBasicTest, RunPrefill) {
@@ -68,7 +67,7 @@ TEST_F(SessionBasicTest, RunPrefill) {
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   auto session = SessionBasic::Create(executor_, tokenizer_, session_config,
                                       /*benchmark_info=*/std::nullopt,
-                                      worker_thread_pool_);
+                                      worker_thread_pool_.get());
   EXPECT_OK((*session)->RunPrefill("Hello World!"));
 }
 
@@ -78,7 +77,7 @@ TEST_F(SessionBasicTest, RunDecode) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   auto session = SessionBasic::Create(executor_, tokenizer_, session_config,
-                                      std::nullopt, worker_thread_pool_);
+                                      std::nullopt, worker_thread_pool_.get());
   EXPECT_OK((*session)->RunPrefill("Hello World!"));
   auto responses = (*session)->RunDecode();
   EXPECT_OK(responses);
@@ -102,7 +101,7 @@ TEST_F(SessionBasicTest, RunPrefillAsync) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   auto session = SessionBasic::Create(executor_, tokenizer_, session_config,
-                                      std::nullopt, worker_thread_pool_);
+                                      std::nullopt, worker_thread_pool_.get());
   TestObserver observer;
   EXPECT_OK((*session)->RunPrefillAsync("Hello World!", &observer));
   // Wait for the async call to finish.
@@ -116,7 +115,7 @@ TEST_F(SessionBasicTest, RunDecodeAsync) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   auto session = SessionBasic::Create(executor_, tokenizer_, session_config,
-                                      std::nullopt, worker_thread_pool_);
+                                      std::nullopt, worker_thread_pool_.get());
   TestObserver observer;
   EXPECT_OK((*session)->RunPrefillAsync("Hello World!", &observer));
   EXPECT_OK((*session)->RunDecodeAsync(&observer));

@@ -33,12 +33,13 @@
 
 namespace litert::lm {
 
-ThreadPool::ThreadPool(const ThreadOptions& thread_options,
-                       const std::string& name_prefix, size_t num_threads)
-    : thread_options_(thread_options),
-      name_prefix_(name_prefix),
-      num_threads_(num_threads == 0 ? 1 : num_threads) {
-  ABSL_LOG(INFO) << "ThreadPool: Created with " << num_threads_ << " threads.";
+ThreadPool::ThreadPool(const std::string& name_prefix, size_t max_num_threads,
+                       ThreadOptions thread_options)
+    : name_prefix_(name_prefix),
+      max_num_threads_(max_num_threads == 0 ? 1 : max_num_threads),
+      thread_options_(std::move(thread_options)) {
+  ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_ << "': Running up to "
+                 << max_num_threads_ << " threads.";
 }
 
 ThreadPool::~ThreadPool() {
@@ -53,48 +54,59 @@ ThreadPool::~ThreadPool() {
 
   for (auto& thread_ptr : threads_to_join) {
     // Wait for each worker thread to finish.
-    thread_ptr->Join();
+    ABSL_CHECK_OK(thread_ptr->Join());
   }
 
-  // Log num_active_tasks_ state at shutdown. Should be 0 if all workers exited
-  // cleanly.
-  int final_num_active_tasks = 0;
   {
     absl::MutexLock lock(&mutex_);
-    final_num_active_tasks = num_active_tasks_;
+    ABSL_CHECK(threads_.empty());
+    ABSL_CHECK_EQ(num_active_tasks_, 0);
   }
-  ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_ << "': Shutdown complete. "
-                 << final_num_active_tasks
-                 << " active tasks recorded at the end (should ideally be 0).";
+  ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_ << "': Shutdown complete. ";
 }
 
-void ThreadPool::StartWorkers() {
-  absl::MutexLock lock(&mutex_);
-  if (!threads_.empty() || stopped_) {
-    ABSL_LOG(WARNING)
-        << "ThreadPool '" << name_prefix_
-        << "': StartWorkers called on an already started or stopped pool.";
-    return;
-  }
-
-  threads_.reserve(num_threads_);
-  for (int i = 0; i < num_threads_; ++i) {
-    threads_.push_back(WorkerThread::Create(*this, name_prefix_));
-  }
-  ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_ << "': Started "
-                 << num_threads_ << " workers.";
-}
-
-void ThreadPool::Schedule(absl::AnyInvocable<void() &&> callback) {
+absl::Status ThreadPool::Schedule(absl::AnyInvocable<void() &&> callback) {
   absl::MutexLock lock(&mutex_);
   if (stopped_) {
     ABSL_LOG(WARNING) << "ThreadPool '" << name_prefix_
-                      << "': Schedule called on a stopped pool. Task for pool '"
-                      << name_prefix_ << "' ignored.";
-    return;
+                      << "': Schedule called on a stopped pool.";
+    return absl::FailedPreconditionError(
+        absl::StrCat("ThreadPool '", name_prefix_, "' is stopped."));
+  }
+
+  // If all worker threads are (supposed to be) busy, instantiates a new worker
+  // thread to run the task.
+  size_t num_threads = threads_.size();
+  if (num_threads < max_num_threads_) {
+    size_t num_tasks = num_active_tasks_ + tasks_.size();
+    if (num_threads <= num_tasks) {
+      auto thread = WorkerThread::Create(this, name_prefix_);
+      if (thread.ok()) {
+        threads_.push_back(std::move(*thread));
+        ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_
+                       << "': Created a worker thread since all " << num_threads
+                       << " worker threads are (supposed to be) busy.";
+      } else if (num_threads == 0) {
+        ABSL_LOG(ERROR) << "ThreadPool '" << name_prefix_
+                        << "': Failed to create the first worker thread: "
+                        << thread.status();
+        // Return the error to the caller since it would be fatal.
+        return thread.status();
+      } else {
+        ABSL_LOG(WARNING) << "ThreadPool '" << name_prefix_
+                          << "': Failed to create a worker thread when all "
+                          << num_threads
+                          << " worker threads are (supposed to be) busy. "
+                          << "Waits for some worker threads to finish: "
+                          << thread.status();
+        // Ignore the error since tasks can still be scheduled by existing
+        // worker threads.
+      }
+    }
   }
 
   tasks_.push_back(std::move(callback));
+  return absl::OkStatus();
 }
 
 absl::Status ThreadPool::WaitUntilIdle(absl::Duration timeout) {
@@ -134,26 +146,26 @@ void ThreadPool::RunWorker() {
   absl::MutexLock lock(&mutex_);
   while (true) {
     // Wait until a task is available OR the pool is stopped.
-    auto is_task_available = [this]() {
+    auto is_task_available_or_stopped = [this]() {
       mutex_.AssertHeld();
       return !tasks_.empty() || stopped_;
     };
-    mutex_.Await(absl::Condition(&is_task_available));
+    mutex_.Await(absl::Condition(&is_task_available_or_stopped));
 
-    if (stopped_ && tasks_.empty()) {
+    if (tasks_.empty()) {
+      ABSL_CHECK(stopped_);
+      ABSL_LOG(INFO) << "ThreadPool '" << name_prefix_
+                     << "': Worker thread stopped.";
       return;
     }
-    ABSL_CHECK(!tasks_.empty());
 
     auto task_to_run = std::move(tasks_.front());
     tasks_.pop_front();
     ++num_active_tasks_;
 
-    // Release mutex before executing task.
+    // Execute the task with mutex released.
     mutex_.Unlock();
-    // Execute the task.
     std::move(task_to_run)();
-    // Task finished. Re-acquire mutex and decrement active tasks.
     mutex_.Lock();
 
     --num_active_tasks_;

@@ -19,6 +19,7 @@
 #include <optional>
 #include <utility>
 
+#include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
@@ -48,10 +49,9 @@ class SessionBasic : public Engine::Session {
   //   handled by the LLM Executor.
   static absl::StatusOr<std::unique_ptr<SessionBasic>> Create(
       std::shared_ptr<LlmExecutor> executor,
-      std::shared_ptr<Tokenizer> tokenizer,
-      const SessionConfig& session_config,
+      std::shared_ptr<Tokenizer> tokenizer, const SessionConfig& session_config,
       std::optional<BenchmarkInfo> benchmark_info,
-      std::shared_ptr<ThreadPool> worker_thread_pool);
+      ThreadPool* absl_nonnull worker_thread_pool);
 
   virtual ~SessionBasic() = default;
 
@@ -72,14 +72,14 @@ class SessionBasic : public Engine::Session {
                         std::unique_ptr<Sampler> sampler,
                         const SessionConfig& session_config,
                         std::optional<BenchmarkInfo> benchmark_info,
-                        std::shared_ptr<ThreadPool> worker_thread_pool,
+                        ThreadPool* absl_nonnull worker_thread_pool,
                         const StopTokenDetector& stop_token_detector)
       : executor_(executor),
         tokenizer_(tokenizer),
         sampler_(std::move(sampler)),
         session_config_(session_config),
         benchmark_info_(benchmark_info),
-        worker_thread_pool_(worker_thread_pool),
+        worker_thread_pool_(*worker_thread_pool),
         stop_token_detector_(stop_token_detector) {}
 
   // The internal function to prefill the input prompt. It is for convenience to
@@ -113,7 +113,7 @@ class SessionBasic : public Engine::Session {
   std::optional<BenchmarkInfo> benchmark_info_;
 
   // The thread pool used for the session.
-  std::shared_ptr<ThreadPool> worker_thread_pool_;
+  ThreadPool& worker_thread_pool_;
 
   // The stop token detector used for the session.
   StopTokenDetector stop_token_detector_;

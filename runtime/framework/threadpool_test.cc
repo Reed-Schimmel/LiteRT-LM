@@ -30,79 +30,104 @@ namespace litert::lm {
 namespace {
 
 TEST(ThreadPoolTest, DestroyWithoutStart) {
-  ThreadPool thread_pool(ThreadOptions(), "testpool", 10);
+  ThreadPool thread_pool("testpool", 10);
+  EXPECT_EQ(thread_pool.max_num_threads(), 10);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
 }
 
 TEST(ThreadPoolTest, EmptyThread) {
-  ThreadPool thread_pool(ThreadOptions(), "testpool", 0);
-  EXPECT_EQ(1, thread_pool.num_threads());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 0);
+  EXPECT_EQ(thread_pool.max_num_threads(), 1);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
 }
 
 TEST(ThreadPoolTest, SingleThread) {
   std::atomic<int> n = 100;
   {
-    ThreadPool thread_pool(ThreadOptions(), "testpool", 1);
-    EXPECT_EQ(1, thread_pool.num_threads());
-    thread_pool.StartWorkers();
+    ThreadPool thread_pool("testpool", 1);
+    EXPECT_EQ(thread_pool.max_num_threads(), 1);
+    EXPECT_EQ(thread_pool.num_threads(), 0);
 
     for (int i = 0; i < 100; ++i) {
-      thread_pool.Schedule([&n]() { --n; });
+      EXPECT_OK(thread_pool.Schedule([&n]() { --n; }));
     }
+    EXPECT_EQ(thread_pool.num_threads(), 1);
   }
-  EXPECT_EQ(0, n);
+  EXPECT_EQ(n, 0);
 }
 
-TEST(ThreadPoolTest, MultiThreads) {
+TEST(ThreadPoolTest, MultiThreadsScheduledFast) {
   std::atomic<int> n = 100;
   {
-    ThreadPool thread_pool(ThreadOptions(), "testpool", 10);
-    ASSERT_EQ(10, thread_pool.num_threads());
-    thread_pool.StartWorkers();
+    ThreadPool thread_pool("testpool", 10);
+    EXPECT_EQ(thread_pool.max_num_threads(), 10);
+    EXPECT_EQ(thread_pool.num_threads(), 0);
 
+    // Schedule 100 tasks back to back.
     for (int i = 0; i < 100; ++i) {
-      thread_pool.Schedule([&n]() { --n; });
+      EXPECT_OK(thread_pool.Schedule([&n]() { --n; }));
     }
+    // Need more workers up to max, 10.
+    EXPECT_EQ(thread_pool.num_threads(), 10);
   }
-  EXPECT_EQ(0, n);
+  EXPECT_EQ(n, 0);
+}
+
+TEST(ThreadPoolTest, MultiThreadsScheduledSlow) {
+  std::atomic<int> n = 100;
+  {
+    ThreadPool thread_pool("testpool", 10);
+    EXPECT_EQ(thread_pool.max_num_threads(), 10);
+    EXPECT_EQ(thread_pool.num_threads(), 0);
+
+    // Schedule 100 tasks with a delay.
+    for (int i = 0; i < 100; ++i) {
+      EXPECT_OK(thread_pool.Schedule([&n]() { --n; }));
+      absl::SleepFor(absl::Milliseconds(10));
+    }
+    // Not many workers are needed since workers are not busy.
+    EXPECT_LT(thread_pool.num_threads(), 10);
+  }
+  EXPECT_EQ(n, 0);
 }
 
 TEST(ThreadPoolTest, CreateWithThreadOptions) {
-  ThreadPool thread_pool(ThreadOptions(), "testpool", 10);
-  ASSERT_EQ(10, thread_pool.num_threads());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 10, ThreadOptions());
+  EXPECT_EQ(thread_pool.max_num_threads(), 10);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
 }
 
 TEST(ThreadPoolTest, CreateWithThreadPriority) {
   ThreadOptions thread_options = ThreadOptions().set_nice_priority_level(-10);
-  ThreadPool thread_pool(thread_options, "testpool", 10);
-  EXPECT_EQ(10, thread_pool.num_threads());
-  EXPECT_EQ(-10, thread_pool.thread_options().nice_priority_level());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 10, thread_options);
+  EXPECT_EQ(thread_pool.max_num_threads(), 10);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
+  EXPECT_EQ(thread_pool.thread_options().nice_priority_level(), -10);
 }
 
 TEST(ThreadPoolTest, CreateWithCPUAffinity) {
   ThreadOptions thread_options = ThreadOptions().set_cpu_set({0});
-  ThreadPool thread_pool(thread_options, "testpool", 10);
-  ASSERT_EQ(10, thread_pool.num_threads());
-  ASSERT_EQ(1, thread_pool.thread_options().cpu_set().size());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 10, thread_options);
+  EXPECT_EQ(thread_pool.max_num_threads(), 10);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
+  EXPECT_EQ(thread_pool.thread_options().cpu_set().size(), 1);
 }
 
 TEST(ThreadPoolTest, WaitUntilIdle) {
-  ThreadPool thread_pool(ThreadOptions(), "testpool", 1);
-  EXPECT_EQ(1, thread_pool.num_threads());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 1);
+  EXPECT_EQ(thread_pool.max_num_threads(), 1);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
 
   absl::Mutex mu;
   std::vector<int> v;
   for (int i = 0; i < 10; ++i) {
-    thread_pool.Schedule([&v, &mu, i]() {
+    EXPECT_OK(thread_pool.Schedule([&v, &mu, i]() {
       // Simulate a task that takes some time to execute.
       absl::SleepFor(absl::Milliseconds(50));
       absl::MutexLock l(&mu);
       v.push_back(i);
-    });
+    }));
+    EXPECT_EQ(thread_pool.num_threads(), 1);
   }
   EXPECT_OK(thread_pool.WaitUntilIdle(absl::Seconds(50)));
   // WaitUntilIdle() should wait until the task queue is empty. Note that when
@@ -112,19 +137,20 @@ TEST(ThreadPoolTest, WaitUntilIdle) {
 }
 
 TEST(ThreadPoolTest, WaitUntilDone) {
-  ThreadPool thread_pool(ThreadOptions(), "testpool", 1);
-  EXPECT_EQ(1, thread_pool.num_threads());
-  thread_pool.StartWorkers();
+  ThreadPool thread_pool("testpool", 1);
+  EXPECT_EQ(thread_pool.max_num_threads(), 1);
+  EXPECT_EQ(thread_pool.num_threads(), 0);
 
   absl::Mutex mu;
   std::vector<int> v;
   for (int i = 0; i < 10; ++i) {
-    thread_pool.Schedule([&v, &mu, i]() {
+    EXPECT_OK(thread_pool.Schedule([&v, &mu, i]() {
       // Simulate a task that takes some time to execute.
       absl::SleepFor(absl::Milliseconds(50));
       absl::MutexLock l(&mu);
       v.push_back(i);
-    });
+    }));
+    EXPECT_EQ(thread_pool.num_threads(), 1);
   }
   EXPECT_OK(thread_pool.WaitUntilDone(absl::Seconds(50)));
   // Even without destroying the thread pool and force all threads to join,

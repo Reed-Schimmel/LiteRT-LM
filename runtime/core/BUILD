@@ -131,6 +131,7 @@ cc_library(
     hdrs = ["session_basic.h"],
     deps = [
         ":pipeline",
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
@@ -181,6 +182,7 @@ cc_library(
     hdrs = ["session_factory.h"],
     deps = [
         ":session_basic",
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/status:statusor",
         "//runtime/components:tokenizer",
         "//runtime/engine:engine_interface",
@@ -205,6 +207,7 @@ cc_test(
         "//runtime/engine:engine_settings",
         "//runtime/executor:fake_llm_executor",
         "//runtime/executor:llm_executor",
+        "//runtime/framework:threadpool",
         "//runtime/util:test_utils",
     ],
 )

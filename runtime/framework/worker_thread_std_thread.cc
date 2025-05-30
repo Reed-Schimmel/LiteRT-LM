@@ -17,7 +17,9 @@
 #include <string>
 #include <thread>  // NOLINT(build/c++11)
 
-#include "absl/log/absl_log.h"  // from @com_google_absl
+#include "absl/base/nullability.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/status/statusor.h"  // from @com_google_absl
 #include "runtime/framework/threadpool.h"
 #include "runtime/framework/worker_thread.h"
 
@@ -26,13 +28,12 @@ namespace {
 
 class WorkerThreadStdThread : public WorkerThread {
  public:
-  WorkerThreadStdThread(ThreadPool& pool, const std::string& name_prefix);
-
-  ~WorkerThreadStdThread() override;
-
-  void Join() override;
+  WorkerThreadStdThread(ThreadPool* absl_nonnull pool,
+                        const std::string& name_prefix);
 
  private:
+  absl::Status JoinImpl() override;
+
   static void* ThreadBody(void* arg);
 
   std::thread thread_;
@@ -40,29 +41,15 @@ class WorkerThreadStdThread : public WorkerThread {
   std::atomic<bool> joined_;
 };
 
-WorkerThreadStdThread::WorkerThreadStdThread(ThreadPool& pool,
+WorkerThreadStdThread::WorkerThreadStdThread(ThreadPool* absl_nonnull pool,
                                              const std::string& name_prefix)
-    : WorkerThread(pool, name_prefix), joined_(false) {
+    : WorkerThread(pool, name_prefix) {
   thread_ = std::thread(ThreadBody, this);
 }
 
-WorkerThreadStdThread::~WorkerThreadStdThread() {
-  if (joined_) {
-    return;
-  }
-
-  ABSL_LOG(WARNING)
-      << "WorkerThread for pool " << name_prefix_
-      << " destroyed without Join(). Potential resource leak or race.";
-}
-
-void WorkerThreadStdThread::Join() {
-  if (joined_) {
-    return;
-  }
-
+absl::Status WorkerThreadStdThread::JoinImpl() {
   thread_.join();
-  joined_ = true;
+  return absl::OkStatus();
 }
 
 void* WorkerThreadStdThread::ThreadBody(void* arg) {
@@ -73,8 +60,8 @@ void* WorkerThreadStdThread::ThreadBody(void* arg) {
 
 }  // namespace
 
-std::unique_ptr<WorkerThread> WorkerThread::Create(
-    ThreadPool& pool, const std::string& name_prefix) {
+absl::StatusOr<std::unique_ptr<WorkerThread>> WorkerThread::Create(
+    ThreadPool* absl_nonnull pool, const std::string& name_prefix) {
   return std::make_unique<WorkerThreadStdThread>(pool, name_prefix);
 }
 

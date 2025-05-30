@@ -19,14 +19,16 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <atomic>
 #include <memory>
 #include <ostream>
 #include <set>
 #include <string>
+#include <utility>
 
-#include "absl/log/absl_check.h"  // from @com_google_absl
+#include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/log/absl_log.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/str_join.h"  // from @com_google_absl
 #include "runtime/framework/thread_options.h"
@@ -53,48 +55,44 @@ std::string CreateThreadName(const std::string& prefix, int thread_id) {
 
 class WorkerThreadPthread : public WorkerThread {
  public:
-  WorkerThreadPthread(ThreadPool& pool, const std::string& name_prefix);
+  WorkerThreadPthread(ThreadPool* absl_nonnull pool,
+                      const std::string& name_prefix);
 
-  ~WorkerThreadPthread() override;
-
-  void Join() override;
+  // Starts the thread and reports the status.
+  absl::Status Start();
 
  private:
+  absl::Status JoinImpl() override;
+
   static void* ThreadBody(void* arg);
 
   pthread_t thread_;
-  // Track if this thread is joined.
-  std::atomic<bool> joined_;
 };
 
-WorkerThreadPthread::WorkerThreadPthread(ThreadPool& pool,
+WorkerThreadPthread::WorkerThreadPthread(ThreadPool* absl_nonnull pool,
                                          const std::string& name_prefix)
-    : WorkerThread(pool, name_prefix), joined_(false) {
+    : WorkerThread(pool, name_prefix) {}
+
+absl::Status WorkerThreadPthread::Start() {
   int res = pthread_create(&thread_, nullptr, ThreadBody, this);
-  ABSL_CHECK_EQ(res, 0) << "pthread_create failed";
-}
-
-WorkerThreadPthread::~WorkerThreadPthread() {
-  if (joined_) {
-    return;
+  if (res == 0) {
+    return absl::OkStatus();
   }
 
-  ABSL_LOG(WARNING)
-      << "WorkerThread for pool " << name_prefix_
-      << " destroyed without Join(). Potential resource leak or race.";
+  return absl::ErrnoToStatus(
+      res, absl::StrCat("pthread_create failed for pool ", name_prefix_, ": ",
+                        strerror(res)));
 }
 
-void WorkerThreadPthread::Join() {
-  if (joined_) {
-    return;
-  }
-
+absl::Status WorkerThreadPthread::JoinImpl() {
   int res = pthread_join(thread_, nullptr);
-  if (res != 0) {
-    ABSL_LOG(ERROR) << "pthread_join failed for pool " << name_prefix_ << ": "
-                    << strerror(res);
+  if (res == 0) {
+    return absl::OkStatus();
   }
-  joined_ = true;
+
+  return absl::ErrnoToStatus(
+      res, absl::StrCat("pthread_join failed for pool ", name_prefix_, ": ",
+                        strerror(res)));
 }
 
 void* WorkerThreadPthread::ThreadBody(void* arg) {
@@ -158,9 +156,14 @@ void* WorkerThreadPthread::ThreadBody(void* arg) {
 
 }  // namespace
 
-std::unique_ptr<WorkerThread> WorkerThread::Create(
-    ThreadPool& pool, const std::string& name_prefix) {
-  return std::make_unique<WorkerThreadPthread>(pool, name_prefix);
+absl::StatusOr<std::unique_ptr<WorkerThread>> WorkerThread::Create(
+    ThreadPool* absl_nonnull pool, const std::string& name_prefix) {
+  auto worker = std::make_unique<WorkerThreadPthread>(pool, name_prefix);
+  auto status = worker->Start();
+  if (!status.ok()) {
+    return status;
+  }
+  return std::move(worker);
 }
 
 }  // namespace litert::lm

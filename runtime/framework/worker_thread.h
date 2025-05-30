@@ -15,9 +15,13 @@
 #ifndef THIRD_PARTY_LITERT_LM_RUNTIME_FRAMEWORK_WORKER_THREAD_H_
 #define THIRD_PARTY_LITERT_LM_RUNTIME_FRAMEWORK_WORKER_THREAD_H_
 
+#include <atomic>
 #include <memory>
 #include <string>
 
+#include "absl/base/nullability.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/status/statusor.h"  // from @com_google_absl
 #include "runtime/framework/threadpool.h"
 
 namespace litert::lm {
@@ -25,24 +29,29 @@ namespace litert::lm {
 class WorkerThread {
  public:
   // Creates and starts a thread that runs pool->RunWorker().
-  static std::unique_ptr<WorkerThread> Create(ThreadPool& pool,
-                                              const std::string& name_prefix);
+  static absl::StatusOr<std::unique_ptr<WorkerThread>> Create(
+      ThreadPool* absl_nonnull pool, const std::string& name_prefix);
 
   // REQUIRES: Join() must have been called.
-  virtual ~WorkerThread() = default;
+  virtual ~WorkerThread();
 
   // Joins with the running thread.
-  virtual void Join() = 0;
+  absl::Status Join();
 
  protected:
-  WorkerThread(ThreadPool& pool, const std::string& name_prefix)
-      : pool_(pool), name_prefix_(name_prefix) {}
+  WorkerThread(ThreadPool* absl_nonnull pool, const std::string& name_prefix);
+
+  // The implementation of Join().
+  virtual absl::Status JoinImpl() = 0;
 
   // For the visibility from WorkerThread subclasses.
-  void RunWorker() { pool_.RunWorker(); }
+  void RunWorker();
 
   ThreadPool& pool_;
   const std::string name_prefix_;
+
+  // Track if this thread is joined.
+  std::atomic<bool> joined_;
 };
 
 }  // namespace litert::lm

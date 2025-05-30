@@ -264,9 +264,8 @@ RunStats CreateAndRun(const std::string& prompt) {
   std::shared_ptr<LlmLiteRtNpuCompiledModelExecutor> executor_shared =
       std::move(executor);
 
-  auto worker_thread_pool = std::make_shared<ThreadPool>(
-      ThreadOptions(), /*name_prefix=*/"engine", /*num_threads=*/1);
-  worker_thread_pool->StartWorkers();
+  ThreadPool worker_thread_pool(/*name_prefix=*/"engine",
+                                /*max_num_threads=*/1);
 
   // Create the session.
   constexpr int kEndOfTurnTokenId = 106;
@@ -286,7 +285,7 @@ RunStats CreateAndRun(const std::string& prompt) {
   session_config.GetMutableStopTokenIds() = {{stop_token_ids}};
   auto session = litert::lm::SessionBasic::Create(executor_shared, tokenizer,
                                                   session_config, std::nullopt,
-                                                  worker_thread_pool);
+                                                  &worker_thread_pool);
 
   // Run the session.
   ABSL_LOG(INFO) << "Prompt: " << prompt;

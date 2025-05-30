@@ -35,9 +35,12 @@ config_setting(
 
 cc_library(
     name = "threadpool",
-    srcs = ["threadpool.cc"] + select({
-        "@platforms//os:windows": ["worker_thread_std_thread.cc"],
+    srcs = [
+        "threadpool.cc",
+        "worker_thread.cc",
+    ] + select({
         ":litert_lm_std_thread": ["worker_thread_std_thread.cc"],
+        "@platforms//os:windows": ["worker_thread_std_thread.cc"],
         "//conditions:default": ["worker_thread_pthread.cc"],
     }),
     hdrs = [
@@ -47,10 +50,12 @@ cc_library(
     deps = [
         ":thread_options",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",

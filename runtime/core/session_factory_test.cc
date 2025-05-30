@@ -13,6 +13,7 @@
 #include "runtime/engine/engine_settings.h"
 #include "runtime/executor/fake_llm_executor.h"
 #include "runtime/executor/llm_executor.h"
+#include "runtime/framework/threadpool.h"
 #include "runtime/util/test_utils.h"  // NOLINT
 
 namespace litert::lm {
@@ -42,9 +43,10 @@ TEST(SessionFactoryTest, InitializeSession) {
                                                       dummy_tokens);
   SessionConfig session_config = SessionConfig::CreateDefault();
   session_config.GetMutableStopTokenIds() = stop_token_ids;
-  auto session = InitializeSession(executor, tokenizer, session_config,
-                                   /*benchmark_info=*/std::nullopt,
-                                   /*worker_thread_pool=*/nullptr);
+  ThreadPool worker_thread_pool("testpool", /*max_num_threads=*/1);
+  auto session =
+      InitializeSession(executor, tokenizer, session_config,
+                        /*benchmark_info=*/std::nullopt, &worker_thread_pool);
   EXPECT_OK(session);
 }
 

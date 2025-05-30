@@ -32,7 +32,7 @@ absl::StatusOr<std::unique_ptr<SessionBasic>> SessionBasic::Create(
     std::shared_ptr<LlmExecutor> executor, std::shared_ptr<Tokenizer> tokenizer,
     const SessionConfig& session_config,
     std::optional<BenchmarkInfo> benchmark_info,
-    std::shared_ptr<ThreadPool> worker_thread_pool) {
+    ThreadPool* worker_thread_pool) {
   ASSIGN_OR_RETURN(
       auto sampler,
       CreateSampler(Backend::CPU, session_config.GetNumOutputCandidates(),
@@ -64,17 +64,18 @@ absl::Status SessionBasic::PrefillInternal(absl::string_view input,
 absl::Status SessionBasic::RunPrefill(absl::string_view input) {
   ABSL_LOG(INFO) << "RunPrefillSync: " << input;
   absl::Status status;
-  worker_thread_pool_->Schedule([this, input_copy = std::string(input),
-                                 &status]() {
-    status = this->PrefillInternal(input_copy, /*wait_for_completion=*/true);
-  });
-  RETURN_IF_ERROR(worker_thread_pool_->WaitUntilDone(Engine::kDefaultTimeout));
+  RETURN_IF_ERROR(worker_thread_pool_.Schedule(
+      [this, input_copy = std::string(input), &status]() {
+        status =
+            this->PrefillInternal(input_copy, /*wait_for_completion=*/true);
+      }));
+  RETURN_IF_ERROR(worker_thread_pool_.WaitUntilDone(Engine::kDefaultTimeout));
   return status;
 }
 
 absl::Status SessionBasic::RunPrefillAsync(absl::string_view input,
                                            InferenceObservable* observer) {
-  worker_thread_pool_->Schedule(
+  return worker_thread_pool_.Schedule(
       [this, input_copy = std::string(input), observer]() {
         absl::Status status =
             this->PrefillInternal(input_copy, /*wait_for_completion=*/false);
@@ -85,7 +86,6 @@ absl::Status SessionBasic::RunPrefillAsync(absl::string_view input,
           observer->OnError(status);
         }
       });
-  return absl::OkStatus();
 }
 
 absl::StatusOr<Responses> SessionBasic::DecodeInternal() {
@@ -129,18 +129,17 @@ absl::Status SessionBasic::DecodeInternalStreaming(
 absl::StatusOr<Responses> SessionBasic::RunDecode() {
   ABSL_LOG(INFO) << "RunDecodeSync";
   absl::StatusOr<Responses> responses;
-  worker_thread_pool_->Schedule(
-      [this, &responses]() { responses = this->DecodeInternal(); });
-  RETURN_IF_ERROR(worker_thread_pool_->WaitUntilDone(Engine::kDefaultTimeout));
+  RETURN_IF_ERROR(worker_thread_pool_.Schedule(
+      [this, &responses]() { responses = this->DecodeInternal(); }));
+  RETURN_IF_ERROR(worker_thread_pool_.WaitUntilDone(Engine::kDefaultTimeout));
   return responses;
 }
 
 absl::Status SessionBasic::RunDecodeAsync(InferenceObservable* observer) {
   ABSL_LOG(INFO) << "RunDecodeAsync";
-  worker_thread_pool_->Schedule([this, observer]() {
-    absl::Status staus = this->DecodeInternalStreaming(observer);
+  return worker_thread_pool_.Schedule([this, observer]() {
+    this->DecodeInternalStreaming(observer).IgnoreError();
   });
-  return absl::OkStatus();
 }
 
 absl::StatusOr<BenchmarkInfo> SessionBasic::GetBenchmarkInfo() {

@@ -42,8 +42,7 @@ class WorkerThread;
 // Sample usage:
 //
 // {
-//   ThreadPool pool("testpool", num_workers);
-//   pool.StartWorkers();
+//   ThreadPool pool("testpool", max_num_workers);
 //   for (int i = 0; i < N; ++i) {
 //     pool.Schedule([i]() { DoWork(i); });
 //   }
@@ -51,27 +50,22 @@ class WorkerThread;
 //
 class ThreadPool {
  public:
-  // Creates a thread pool that creates and can use up to "num_threads"
+  // Creates a thread pool that creates and can use up to "max_num_threads"
   // threads.  Any standard thread options, such as stack size, should
   // be passed via "thread_options".  "name_prefix" specifies the
   // thread name prefix.
-  ThreadPool(const ThreadOptions& thread_options,
-             const std::string& name_prefix, size_t num_threads);
+  ThreadPool(const std::string& name_prefix, size_t max_num_threads,
+             ThreadOptions thread_options = ThreadOptions());
 
   // Waits for closures (if any) to complete. May be called without
   // having called StartWorkers().
   ~ThreadPool();
 
-  // REQUIRES: StartWorkers has not been called.
-  // Actually starts the worker threads.
-  void StartWorkers();
-
-  // REQUIRES: StartWorkers has been called.
   // Adds specified callback to queue of pending callbacks.  Eventually a
   // thread will pull this callback off the queue and execute it. Note that
   // this does not guarantee that the callback is executed in the order it was
   // scheduled.
-  void Schedule(absl::AnyInvocable<void() &&> callback);
+  absl::Status Schedule(absl::AnyInvocable<void() &&> callback);
 
   // Waits until the task queue is empty. The function will return an error if
   // the timeout is reached before the task queue is empty.
@@ -86,9 +80,14 @@ class ThreadPool {
   // callbacks are finished.
   absl::Status WaitUntilDone(absl::Duration timeout);
 
-  // Provided for debugging and testing only.
-  // The number of threads in the pool.
-  size_t num_threads() const { return num_threads_; }
+  // Maximum number of threads in the pool.
+  size_t max_num_threads() const { return max_num_threads_; }
+
+  // Number of threads in the pool spawned actually.
+  size_t num_threads() const {
+    absl::MutexLock lock(&mutex_);
+    return threads_.size();
+  }
 
   // Standard thread options.  Use this accessor to get them.
   const ThreadOptions& thread_options() const { return thread_options_; }
@@ -96,16 +95,16 @@ class ThreadPool {
  private:
   friend class WorkerThread;
 
-  // Thread options.
-  const ThreadOptions thread_options_;
   const std::string name_prefix_;
   // The number of threads in the pool.
-  const size_t num_threads_;
+  const size_t max_num_threads_;
+  // Thread options.
+  const ThreadOptions thread_options_;
 
   // The main function of the worker thread.
   void RunWorker();
 
-  absl::Mutex mutex_;
+  mutable absl::Mutex mutex_;
   std::vector<std::unique_ptr<WorkerThread>> threads_ ABSL_GUARDED_BY(mutex_);
   // Whether the pool is stopped.
   bool stopped_ ABSL_GUARDED_BY(mutex_) = false;
