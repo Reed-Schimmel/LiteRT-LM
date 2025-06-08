@@ -58,14 +58,16 @@ cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
     # The LiteRT GPU path is not ready yet. Only test the CPU path.
-    args = ["--gunit_filter=EngineTest.CreateEngine"],
+    args = ["--gunit_filter=-EngineTest.CreateEngineGPU*"],
     data = ["//runtime/testdata"],
     deps = [
         ":engine_impl",  # buildcleaner: keep
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/cleanup",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "//runtime/engine:engine_interface",
         "//runtime/engine:engine_settings",
         "//runtime/engine:io_types",
@@ -111,9 +113,7 @@ cc_library(
 cc_test(
     name = "pipeline_test",
     srcs = ["pipeline_test.cc"],
-    data = [
-        "//runtime/components/testdata:sentencepiece.model",
-    ],
+    data = ["//runtime/components/testdata"],
     deps = [
         ":pipeline",
         "@com_google_googletest//:gtest_main",
@@ -162,9 +162,7 @@ cc_library(
 cc_test(
     name = "session_basic_test",
     srcs = ["session_basic_test.cc"],
-    data = [
-        "//runtime/components/testdata:sentencepiece.model",
-    ],
+    data = ["//runtime/components/testdata"],
     deps = [
         ":session_basic",
         "@com_google_googletest//:gtest_main",

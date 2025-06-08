@@ -148,7 +148,7 @@ cc_library(
 cc_test(
     name = "sentencepiece_tokenizer_test",
     srcs = ["sentencepiece_tokenizer_test.cc"],
-    data = [":testdata"],
+    data = ["//runtime/components/testdata"],
     deps = [
         ":sentencepiece_tokenizer",
         "@com_google_googletest//:gtest_main",

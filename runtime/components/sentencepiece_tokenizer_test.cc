@@ -34,7 +34,11 @@ std::string GetSentencePieceModelPath() {
 }
 
 absl::StatusOr<std::string> GetContents(absl::string_view path) {
+#ifdef _WIN32
+  int fd = open(path.data(), O_RDONLY | O_BINARY);
+#else
   int fd = open(path.data(), O_RDONLY);
+#endif
   if (fd < 0) {
     return absl::NotFoundError(absl::StrCat("File not found: ", path));
   }
@@ -53,6 +57,8 @@ absl::StatusOr<std::string> GetContents(absl::string_view path) {
     int read_bytes = read(fd, contents_ptr, contents_length);
     if (read_bytes < 0) {
       return absl::InternalError(absl::StrCat("Failed to read: ", path));
+    } else if (read_bytes == 0) {
+      return absl::InternalError(absl::StrCat("File is empty: ", path));
     }
     contents_ptr += read_bytes;
     contents_length -= read_bytes;
