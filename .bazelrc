@@ -372,10 +372,8 @@ build:avx_linux --copt=-mavx
 build:avx_linux --host_copt=-mavx
 build:avx_win --copt=/arch:AVX
 
-# Add -march=native to linux and macos to turn all available instructions on.
-build:linux --copt=-march=native
-build:macos --copt=-march=native
-# Assume AVX on Windows.
+# Assume AVX x86_64 platforms for linux and windows.
+build:linux --copt=-mavx
 build:windows --copt=/arch:AVX
 
 # Enable all targets in XLA
