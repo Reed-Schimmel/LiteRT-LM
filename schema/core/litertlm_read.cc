@@ -288,13 +288,15 @@ absl::Status ReadSectionIntoHfTokenizerJsonData(
   if (full_binary_data.length() < sizeof(uint64_t)) {
     return absl::InternalError("Data too short to contain compressed size.");
   }
-  size_t uncompressed_buffer_size;
+  uint64_t uncompressed_buffer_size;
   std::memcpy(&uncompressed_buffer_size, full_binary_data.data(),
               sizeof(uint64_t));
   std::vector<Bytef> uncompressed_buffer(uncompressed_buffer_size);
 
   // Decompress the data.
-  int result = uncompress(uncompressed_buffer.data(), &uncompressed_buffer_size,
+  uLongf uncompressed_size_ulongf =
+      static_cast<uLongf>(uncompressed_buffer_size);
+  int result = uncompress(uncompressed_buffer.data(), &uncompressed_size_ulongf,
                           reinterpret_cast<const Bytef*>(
                               full_binary_data.data() + sizeof(uint64_t)),
                           full_binary_data.length() - sizeof(uint64_t));
