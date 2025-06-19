@@ -40,6 +40,9 @@
 #
 # Default build options. These are applied first and unconditionally.
 
+build --define=DISABLE_HUGGINGFACE_TOKENIZER=1
+build --define=resolve_symbols_in_exec=true
+
 # For projects which use TensorFlow as part of a Bazel build process, putting
 # nothing in a bazelrc will default to a monolithic build. The following line
 # opts in to modular op registration support by default.
