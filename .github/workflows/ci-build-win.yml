@@ -3,6 +3,11 @@ on:
   push:
     tags:
     - v*.*.*
+  pull_request:
+    branches:
+    - main
+    paths:
+    - .github/workflows/ci-build-win.yml
   schedule:
     - cron: "0 10 * * *"  # Run at 2am PST (10am UTC) every day as postsubmit.
   workflow_dispatch:  # Manual trigger
@@ -45,10 +50,14 @@ jobs:
           echo "CACHE_RESTORE_KEY_0=$CACHE_RESTORE_KEY_0" >> "$env:GITHUB_OUTPUT"
           echo "CACHE_KEY=$CACHE_KEY" >> "$env:GITHUB_OUTPUT"
 
+      - name: Clean build outputs if cache is being refreshed.
+        if: env.REFRESH_CACHE == 'true'
+        run: bazel clean --expunge
+
       - name: Restore bazel cache if cache is not being refreshed.
-        if: ! env.REFRESH_CACHE
-        uses: actions/cache/restore@v4
         id: bazel-cache
+        if: env.REFRESH_CACHE != 'true'
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/bazel-windows
           key: ${{ steps.cache-keys.outputs.CACHE_KEY }}
@@ -86,12 +95,12 @@ jobs:
             -//runtime/components:huggingface_tokenizer_test
 
       - name: Remove cache if cache is being refreshed.
-        if: env.REFRESH_CACHE
+        if: env.REFRESH_CACHE == 'true'
         run: gh cache delete ${{ steps.cache-keys.outputs.CACHE_KEY }} || echo "Cache not found"
 
       - name: Save bazel cache if it's new or being refreshed.
         uses: actions/cache/save@v4
-        if: env.REFRESH_CACHE || steps.bazel-cache.outputs.cache-hit != 'true'
+        if: env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/bazel-windows
           key: ${{ steps.cache-keys.outputs.CACHE_KEY }}
