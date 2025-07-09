@@ -45,7 +45,8 @@ absl::StatusOr<std::unique_ptr<SessionBasic>> SessionBasic::Create(
         sampler,
         CreateSampler(sampler_backend, session_config.GetNumOutputCandidates(),
                       session_config.GetSamplerParams()));
-  } else if (sampler_backend != Backend::GPU) {
+  } else if (sampler_backend != Backend::GPU &&
+             sampler_backend != Backend::NPU) {
     return absl::InvalidArgumentError(
         absl::StrCat("Unsupported sampler backend: ", sampler_backend));
   }

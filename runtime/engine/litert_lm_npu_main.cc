@@ -36,7 +36,6 @@ ABSL_FLAG(std::string, gemma3_litertlm_path, "",
 ABSL_FLAG(std::string, gemma3_path, "", "Path to the Gemma3 model.");
 ABSL_FLAG(std::string, embedder_path, "", "Path to the embedder model.");
 ABSL_FLAG(std::string, auxiliary_path, "", "Path to the auxiliary model.");
-ABSL_FLAG(std::string, tokenizer_path, "", "Path to the tokenizer model.");
 ABSL_FLAG(std::string, litert_dispatch_lib_path, "",
           "Path to the LiteRT dispatch library.");
 ABSL_FLAG(std::string, prompt, "", "Prompt to run.");
@@ -210,6 +209,7 @@ RunStats CreateAndRun(const std::string& prompt) {
       litert::lm::LlmExecutorSettings::CreateDefault(std::move(model_assets),
                                                      litert::lm::Backend::NPU)
           .value();
+  executor_settings.SetMaxNumTokens(1280);
   auto executor = LlmLiteRtNpuCompiledModelExecutor::Create(
       executor_settings, **model_resources,
       absl::GetFlag(FLAGS_litert_dispatch_lib_path));
@@ -242,6 +242,7 @@ RunStats CreateAndRun(const std::string& prompt) {
   auto session_config = litert::lm::SessionConfig::CreateDefault();
   session_config.GetMutableSamplerParams().set_type(
       litert::lm::proto::SamplerParameters::TYPE_UNSPECIFIED);
+  session_config.SetSamplerBackend(litert::lm::Backend::NPU);
   session_config.GetMutableStopTokenIds() = {{stop_token_ids}};
   constexpr int kBeginOfTurnTokenId = 2;
   session_config.SetStartTokenId(kBeginOfTurnTokenId);
