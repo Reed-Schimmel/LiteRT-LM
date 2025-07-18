@@ -24,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <iostream>
 
 #include "absl/base/log_severity.h"  // from @com_google_absl
 #include "absl/flags/flag.h"  // from @com_google_absl
@@ -70,6 +71,8 @@ ABSL_FLAG(bool, report_peak_memory_footprint, false,
           "Report peak memory footprint.");
 ABSL_FLAG(bool, force_f32, false,
           "Force float 32 precision for the activation data type.");
+ABSL_FLAG(bool, multi_turns, false,
+          "If true, the command line will ask for multi-turns input.");
 
 namespace {
 
@@ -121,7 +124,8 @@ absl::Status MainHelper(int argc, char** argv) {
            "[--benchmark_prefill_tokens=<num_prefill_tokens>] "
            "[--benchmark_decode_tokens=<num_decode_tokens>] "
            "[--async=<true|false>] "
-           "[--report_peak_memory_footprint]";
+           "[--report_peak_memory_footprint]"
+           "[--multi_turns=<true|false>]";
     return absl::InvalidArgumentError("No arguments provided.");
   }
 
@@ -188,26 +192,42 @@ absl::Status MainHelper(int argc, char** argv) {
   const bool is_dummy_input =
       absl::GetFlag(FLAGS_benchmark_prefill_tokens) > 0 ||
       absl::GetFlag(FLAGS_benchmark_decode_tokens) > 0;
-  const std::string input_prompt = absl::GetFlag(FLAGS_input_prompt);
-  if (absl::GetFlag(FLAGS_async)) {
-    if (is_dummy_input) {
-      ABSL_LOG(FATAL)
-          << "Async mode does not support benchmarking with "
-             "specified number of prefill or decode tokens. If you want to "
-             "benchmark the model, please try again with --async=false.";
-    }
-    InferenceObservable observable;
-    absl::Status status = (*session)->GenerateContentStream(
-        {InputText(input_prompt)}, &observable);
-    ABSL_CHECK_OK(status);
-    ABSL_CHECK_OK((*llm)->WaitUntilDone(kWaitUntilDoneTimeout));
-  } else {
-    auto responses = (*session)->GenerateContent({InputText(input_prompt)});
-    ABSL_CHECK_OK(responses);
-    if (!is_dummy_input) {
-      ABSL_LOG(INFO) << "Responses: " << *responses;
+  std::string input_prompt = absl::GetFlag(FLAGS_input_prompt);
+  const bool is_multi_turns = absl::GetFlag(FLAGS_multi_turns);
+  if (is_multi_turns) {
+    if (absl::GetFlag(FLAGS_benchmark)) {
+      ABSL_LOG(FATAL) <<
+          "Benchmarking with multi-turns input is not supported.";
     }
   }
+  do {
+    if (is_multi_turns) {
+      std::cout << "Please enter the prompt (or press Enter to end): ";
+      std::getline(std::cin, input_prompt);
+      if (input_prompt.empty()) {
+        break;
+      }
+    }
+    if (absl::GetFlag(FLAGS_async)) {
+      if (is_dummy_input) {
+        ABSL_LOG(FATAL)
+            << "Async mode does not support benchmarking with "
+               "specified number of prefill or decode tokens. If you want to "
+               "benchmark the model, please try again with --async=false.";
+      }
+      InferenceObservable observable;
+      absl::Status status = (*session)->GenerateContentStream(
+          {InputText(input_prompt)}, &observable);
+      ABSL_CHECK_OK(status);
+      ABSL_CHECK_OK((*llm)->WaitUntilDone(kWaitUntilDoneTimeout));
+    } else {
+      auto responses = (*session)->GenerateContent({InputText(input_prompt)});
+      ABSL_CHECK_OK(responses);
+      if (!is_dummy_input) {
+        ABSL_LOG(INFO) << "Responses: " << *responses;
+      }
+    }
+  } while (is_multi_turns);
 
   if (absl::GetFlag(FLAGS_benchmark)) {
     auto benchmark_info = (*session)->GetBenchmarkInfo();
