@@ -34,7 +34,7 @@ class VisionExecutorBase {
   // 1, num_vision_tokens, model_dimension]` and per layer embeddings with
   // shape `[batch, stack_size, num_vision_tokens,
   // per_layer_embedding_dimension]`.
-  virtual absl::StatusOr<::litert::lm::ExecutorVisionData> Encode(
+  virtual absl::StatusOr<ExecutorVisionData> Encode(
       const litert::TensorBuffer& input_image_tensor) = 0;
 
   // Get the expected input dimension of the vision executor.
