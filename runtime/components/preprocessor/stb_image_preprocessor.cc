@@ -33,11 +33,10 @@
 #include "runtime/engine/io_types.h"
 #include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
-#include "third_party/stblib/stb_image.h"
-// The stb_image_resize library requires this macro to be defined in one C++
-// file to include the function implementations.
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"  // from @stb
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "third_party/stblib/stb_image_resize.h"
+#include "stb_image_resize2.h"  // from @stb
 
 namespace litert::lm {
 
@@ -83,9 +82,19 @@ absl::StatusOr<InputImage> StbImagePreprocessor::Preprocess(
 
   std::vector<uint8_t> resized_image(static_cast<size_t>(target_width) *
                                      target_height * target_channels);
-  if (stbir_resize_uint8(decoded_image, original_width, original_height, 0,
-                         resized_image.data(), target_width, target_height, 0,
-                         target_channels) == 0) {
+
+  int alpha_channel = -1;
+  if (target_channels == 4) {
+    alpha_channel = 3;
+  } else if (target_channels == 2) {
+    alpha_channel = 1;
+  }
+
+  if (stbir_resize(decoded_image, original_width, original_height, 0,
+                   resized_image.data(), target_width, target_height, 0,
+                   static_cast<stbir_pixel_layout>(target_channels),
+                   STBIR_TYPE_UINT8_SRGB, STBIR_EDGE_CLAMP,
+                   STBIR_FILTER_MITCHELL) == 0) {
     return absl::InternalError("Failed to resize image.");
   }
 

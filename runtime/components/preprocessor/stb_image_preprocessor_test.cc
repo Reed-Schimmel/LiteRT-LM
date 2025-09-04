@@ -35,7 +35,6 @@ namespace litert::lm {
 namespace {
 
 using ::testing::ElementsAre;
-using ::testing::HasSubstr;
 using ::testing::status::StatusIs;
 
 constexpr char kTestdataDir[] =
@@ -121,7 +120,7 @@ TEST(StbImagePreprocessorTest, PreprocessSuccess) {
       << "B at (0,223)";
 
   // --- Sample 3: Center Pixel (112, 112) ---
-  const float expected_112_112_r = 0.37647059f;
+  const float expected_112_112_r = 0.38039216f;
   const float expected_112_112_g = 0.00784314f;
   const float expected_112_112_b = 0.00392157f;
   int idx_112_112 = get_pixel_index(height / 2, width / 2);
@@ -145,9 +144,9 @@ TEST(StbImagePreprocessorTest, PreprocessSuccess) {
       << "B at (223,0)";
 
   // --- Sample 5: Bottom-Right Pixel (223, 223) ---
-  const float expected_223_223_r = 0.79215688f;
-  const float expected_223_223_g = 0.72549021f;
-  const float expected_223_223_b = 0.65098041f;
+  const float expected_223_223_r = 0.79607844f;
+  const float expected_223_223_g = 0.72941178f;
+  const float expected_223_223_b = 0.65490198f;
   int idx_223_223 = get_pixel_index(height - 1, width - 1);
   EXPECT_NEAR(data[idx_223_223 + 0], expected_223_223_r, kTolerance)
       << "R at (223,223)";
@@ -176,8 +175,7 @@ TEST(StbImagePreprocessorTest, PreprocessFailedWithInvalidImage) {
 
   EXPECT_THAT(
       preprocessor.Preprocess(InputImage(invalid_image_bytes), parameter),
-      StatusIs(absl::StatusCode::kInvalidArgument,
-               HasSubstr("Failed to decode image.")));
+      StatusIs(absl::StatusCode::kInvalidArgument, "Failed to decode image."));
 }
 
 }  // namespace
