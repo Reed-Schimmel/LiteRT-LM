@@ -211,6 +211,7 @@ cc_library(
         "//conditions:default": [
             "@litert//litert/c:litert_common",
             "@litert//litert/c:litert_environment_options",
+            "@litert//litert/c/internal:litert_external_litert_buffer_context",  # buildcleaner: keep
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_environment",
             "@litert//litert/cc:litert_expected",
