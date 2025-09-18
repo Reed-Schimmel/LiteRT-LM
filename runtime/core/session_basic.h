@@ -74,6 +74,19 @@ class SessionBasic : public Engine::Session {
   absl::Status GenerateContentStream(const std::vector<InputData>& contents,
                                      InferenceObservable* observer) override;
 
+
+  // Scores the target text after the prefill process is done. This function
+  // will only run the decode process to fetch the decode output logits, which
+  // is used to calculate the target text's score and update the model memory
+  // using the target_text tokens.
+  // This function should be called after the prefill process is done.
+  // - target_text: The target text to score.
+  // - return: This function returns the score associated with the target
+  // text after the model has been prefilled. The returned score is the sum of
+  // the negative log probability of seeing the target text during decode.
+  absl::StatusOr<Responses> RunTextScoring(
+      std::vector<absl::string_view> target_text) override;
+
   absl::Status RunPrefill(const std::vector<InputData>& contents) override;
   absl::Status RunPrefillAsync(const std::vector<InputData>& contents,
                                InferenceObservable* observer) override;

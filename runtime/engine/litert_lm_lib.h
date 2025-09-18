@@ -43,6 +43,7 @@ struct LiteRtLmSettings {
   int num_cpu_threads = 0;
   bool clear_kv_cache_before_prefill = false;
   int num_logits_to_print_after_decode = 0;
+  std::optional<std::string> score_target_text = std::nullopt;
 };
 
 absl::Status RunLiteRtLm(const LiteRtLmSettings& settings);

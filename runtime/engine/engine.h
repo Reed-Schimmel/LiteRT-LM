@@ -87,6 +87,19 @@ class Engine {
         const std::vector<InputData>& contents,
         InferenceObservable* observer) = 0;
 
+
+    // Scores the target text after the prefill process is done. This function
+    // will only run the decode process to fetch the decode output logits, which
+    // is used to calculate the target text's score and update the model memory
+    // using the target_text tokens.
+    // This function should be called after the prefill process is done.
+    // - target_text: The target text to score.
+    // - returns: This function returns the score associated with the target
+    // text after the model has been prefilled. The returned score is the sum of
+    // the negative log probability of seeing the target text during decode.
+    virtual absl::StatusOr<Responses> RunTextScoring(
+        std::vector<absl::string_view> target_text) = 0;
+
     // Adds the input prompt/query to the model for starting the prefilling
     // process. Note that the user can break down their prompt/query into
     // multiple chunks and call this function multiple times.

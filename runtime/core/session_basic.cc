@@ -402,7 +402,6 @@ absl::StatusOr<InputText> SessionBasic::StringToProcessedInputText(
   } else if (bos_token_found) {
     ids.insert(ids.begin(), session_config_.GetStartTokenId());
   }
-
   ASSIGN_OR_RETURN(auto ids_buffer, tokenizer_.TokenIdsToTensorBuffer(ids));
   return InputText(std::move(ids_buffer));
 }
@@ -617,6 +616,33 @@ absl::StatusOr<Responses> SessionBasic::GenerateContent(
   }
   RETURN_IF_ERROR(RunPrefill(contents));
   return RunDecode();
+}
+
+absl::StatusOr<Responses> SessionBasic::RunTextScoring(
+    std::vector<absl::string_view> target_text) {
+  if (target_text.empty()) {
+    return absl::InvalidArgumentError("Target text is empty.");
+  }
+  std::vector<int> decoded_ids(session_config_.GetNumOutputCandidates(),
+                               last_prefill_token_id_);
+  // Remove the last token from the decoded ids, since the last prefill token
+  // is used as the query during decoding of the model.
+  auto decoded_ids_buffer = CopyToTensorBuffer<int>(
+      decoded_ids, {session_config_.GetNumOutputCandidates(), 1});
+  // TODO(b/435040163): Handle the temperature. Should it be calculated from
+  // the sampler or the sampler parameters? For now, hardcode it to 1.0f for
+  // testing.
+  auto temperature = 1.0f;
+  absl::StatusOr<Responses> score;
+  // Scheduled on the worker thread pool to ensire serialized execution with
+  // other engine operations as the function waits for completion.
+  RETURN_IF_ERROR(worker_thread_pool_.Schedule(
+      [this, &score, &target_text, &decoded_ids_buffer, &temperature]() {
+        score = ScoreCustomSampling(executor_, tokenizer_, target_text,
+                                    temperature, *decoded_ids_buffer);
+      }));
+  RETURN_IF_ERROR(worker_thread_pool_.WaitUntilDone(Engine::kDefaultTimeout));
+  return score;
 }
 
 absl::Status SessionBasic::GenerateContentStream(

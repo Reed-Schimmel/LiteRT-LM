@@ -78,6 +78,7 @@ ABSL_FLAG(int, num_logits_to_print_after_decode, 0,
           "The number of values at the beginning of logits, in the middle of "
           "logits, and at the end of logits to print after each decode step. "
           "If 0, disables printing logits.");
+ABSL_FLAG(std::string, score_target_text, "", "Target text to score.");
 ABSL_FLAG(std::optional<std::vector<std::string>>, image_files, std::nullopt,
           "The path to the image files that to be used for vision modality.");
 ABSL_FLAG(std::optional<std::vector<std::string>>, audio_files, std::nullopt,
@@ -134,6 +135,7 @@ absl::Status MainHelper(int argc, char** argv) {
   }
 
   litert::lm::LiteRtLmSettings settings;
+
   settings.backend = absl::GetFlag(FLAGS_backend);
   settings.vision_backend = absl::GetFlag(FLAGS_vision_backend);
   settings.audio_backend = absl::GetFlag(FLAGS_audio_backend);
@@ -157,6 +159,7 @@ absl::Status MainHelper(int argc, char** argv) {
       absl::GetFlag(FLAGS_clear_kv_cache_before_prefill);
   settings.num_logits_to_print_after_decode =
       absl::GetFlag(FLAGS_num_logits_to_print_after_decode);
+  settings.score_target_text = absl::GetFlag(FLAGS_score_target_text);
   return litert::lm::RunLiteRtLm(settings);
 }
 

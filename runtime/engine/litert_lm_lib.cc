@@ -23,6 +23,7 @@
 
 #include "runtime/engine/litert_lm_lib.h"
 
+#include <cstdint>
 #include <filesystem>  // NOLINT
 #include <fstream>
 #include <iostream>
@@ -166,6 +167,18 @@ void RunMultiTurnConversation(const LiteRtLmSettings& settings,
   } while (true);
 }
 
+void RunScoreText(litert::lm::Engine* llm, litert::lm::Engine::Session* session,
+                  std::string& input_prompt, std::string& target_text) {
+  std::vector<litert::lm::InputData> inputs;
+  inputs.emplace_back(InputText(input_prompt));
+  std::vector<absl::string_view> target_text_vector;
+  target_text_vector.push_back(target_text);
+  ABSL_CHECK_OK(session->RunPrefill(inputs));
+  auto response = session->RunTextScoring(target_text_vector);
+  ABSL_CHECK_OK(response);
+  ABSL_LOG(INFO) << "Score: " << -1 * (*response->GetScoreAt(0)) << std::endl;
+}
+
 }  // namespace
 
 absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
@@ -292,7 +305,13 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
       (*engine)->CreateSession(session_config);
   ABSL_CHECK_OK(session) << "Failed to create session";
 
-  if (settings.multi_turns) {
+  if (settings.score_target_text.has_value() &&
+      !settings.score_target_text->empty()) {
+    std::string input_prompt = settings.input_prompt;
+    std::string score_target_text = settings.score_target_text.value();
+    RunScoreText(engine->get(), session->get(), input_prompt,
+                 score_target_text);
+  } else if (settings.multi_turns) {
     RunMultiTurnConversation(settings, engine->get(), session->get());
   } else {
     std::string input_prompt = settings.input_prompt;
