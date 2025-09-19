@@ -15,12 +15,14 @@
 #include <cstdlib>
 #include <filesystem>  // NOLINT: Required for path manipulation.
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/cleanup/cleanup.h"  // from @com_google_absl
 #include "absl/log/absl_check.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "runtime/engine/engine.h"
@@ -86,7 +88,7 @@ TEST(EngineTest, CreateEngine_WithoutCache) {
 
 TEST(EngineTest, CreateEngine_WithCache) {
   auto cache_path = std::filesystem::path(::testing::TempDir()) /
-       absl::StrCat("cache-", std::rand());
+                    absl::StrCat("cache-", std::rand());
   std::filesystem::remove_all(cache_path);
   absl::Cleanup remove_cache = [cache_path] {
     std::filesystem::remove_all(cache_path);
@@ -150,6 +152,42 @@ TEST(EngineTest, CreateEngine_WithCache) {
   EXPECT_OK(responses);
   EXPECT_EQ(responses->GetNumOutputCandidates(), 1);
   EXPECT_FALSE(responses->GetResponseTextAt(0)->empty());
+}
+
+TEST(EngineTest, CreateEngine_FailsNoVisionModel) {
+  auto task_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm_new_metadata.task";
+  auto model_assets = ModelAssets::Create(task_path.string());
+  ASSERT_OK(model_assets);
+  auto engine_settings = EngineSettings::CreateDefault(
+      *model_assets, /*backend=*/Backend::CPU, /*vision_backend=*/Backend::CPU,
+      /*audio_backend=*/std::nullopt);
+  engine_settings->GetMutableMainExecutorSettings().SetMaxNumTokens(
+      kMaxNumTokens);
+  engine_settings->GetMutableMainExecutorSettings().SetCacheDir(":nocache");
+  EXPECT_THAT(Engine::CreateEngine(*engine_settings),
+              testing::status::StatusIs(
+                  absl::StatusCode::kNotFound,
+                  "TF_LITE_VISION_ENCODER not found in the model."));
+}
+
+TEST(EngineTest, CreateEngine_FailsNoAudioModel) {
+  auto task_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm_new_metadata.task";
+  auto model_assets = ModelAssets::Create(task_path.string());
+  ASSERT_OK(model_assets);
+  auto engine_settings = EngineSettings::CreateDefault(
+      *model_assets, /*backend=*/Backend::CPU, /*vision_backend=*/std::nullopt,
+      /*audio_backend=*/Backend::CPU);
+  engine_settings->GetMutableMainExecutorSettings().SetMaxNumTokens(
+      kMaxNumTokens);
+  engine_settings->GetMutableMainExecutorSettings().SetCacheDir(":nocache");
+  EXPECT_THAT(Engine::CreateEngine(*engine_settings),
+              testing::status::StatusIs(
+                  absl::StatusCode::kNotFound,
+                  "TF_LITE_AUDIO_ENCODER_HW not found in the model."));
 }
 
 // TODO (b/397975034): Add more tests for Engine.

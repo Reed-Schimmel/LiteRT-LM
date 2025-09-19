@@ -59,9 +59,9 @@ TEST(VisionLiteRtCompiledModelExecutorTest, CreateExecutorTest) {
                            /*adapter_backend=*/Backend::GPU));
 
   auto vision_executor = VisionLiteRtCompiledModelExecutor::Create(settings);
-  EXPECT_TRUE(absl::IsInvalidArgument(vision_executor.status()));
-  EXPECT_TRUE(absl::StrContains(vision_executor.status().message(),
-                                "Failed to load model from buffer"));
+  EXPECT_THAT(vision_executor,
+              StatusIs(absl::StatusCode::kNotFound,
+                       "TF_LITE_VISION_ENCODER not found in the model."));
 }
 
 }  // namespace

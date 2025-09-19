@@ -124,10 +124,12 @@ TEST(ModelResourcesTest, GetTFLiteModelNotFound) {
   ASSERT_OK(model_resources);
 
   // Attempt to get a model type that doesn't exist in the test file.
-  auto tflite_model =
-      model_resources.value()->GetTFLiteModelBuffer(ModelType::kTfLiteEmbedder);
-  EXPECT_THAT(tflite_model,
-              testing::status::StatusIs(absl::StatusCode::kNotFound));
+  EXPECT_THAT(
+      model_resources.value()->GetTFLiteModelBuffer(ModelType::kTfLiteEmbedder),
+      testing::status::StatusIs(absl::StatusCode::kNotFound));
+  EXPECT_THAT(
+      model_resources.value()->GetTFLiteModel(ModelType::kTfLiteEmbedder),
+      testing::status::StatusIs(absl::StatusCode::kNotFound));
 }
 
 TEST(ModelResourcesTest, GetTFLiteModelNotFoundTask) {

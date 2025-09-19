@@ -23,6 +23,7 @@
 #include "absl/memory/memory.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "litert/cc/litert_buffer_ref.h"  // from @litert
 #include "litert/cc/litert_macros.h"  // from @litert
@@ -60,6 +61,10 @@ absl::StatusOr<const litert::Model*> ModelResourcesLitertLm::GetTFLiteModel(
       litert_lm_loader_->GetTFLiteModel(model_type);
   ABSL_LOG(INFO) << "model_type: " << ModelTypeToString(model_type);
   ABSL_LOG(INFO) << "litert model size: " << buffer_ref.Size();
+  if (buffer_ref.Size() == 0) {
+    return absl::NotFoundError(absl::StrCat(ModelTypeToString(model_type),
+                                            " not found in the model."));
+  }
   LITERT_ASSIGN_OR_RETURN(auto model, Model::CreateFromBuffer(buffer_ref));
   model_map_[model_type] = std::make_unique<litert::Model>(std::move(model));
   return model_map_[model_type].get();
@@ -73,7 +78,8 @@ absl::StatusOr<absl::string_view> ModelResourcesLitertLm::GetTFLiteModelBuffer(
   ABSL_LOG(INFO) << "model_type: " << ModelTypeToString(model_type);
   ABSL_LOG(INFO) << "litert model size: " << buffer_ref.Size();
   if (buffer_ref.Size() == 0) {
-    return absl::NotFoundError("No TFLite model found in the model.");
+    return absl::NotFoundError(absl::StrCat(ModelTypeToString(model_type),
+                                            " not found in the model."));
   }
   return buffer_ref.StrView();
 };

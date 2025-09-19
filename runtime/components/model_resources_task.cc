@@ -65,9 +65,8 @@ absl::StatusOr<const litert::Model*> ModelResourcesTask::GetTFLiteModel(
   std::string model_file = litert::lm::ModelTypeToString(model_type);
   auto buffer = model_asset_bundle_resources_->GetFile(model_file);
   if (!buffer.ok()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to get model file: ", model_file,
-                     "for model type: ", model_type));
+    return absl::NotFoundError(absl::StrCat(ModelTypeToString(model_type),
+                                            " not found in the model."));
   }
   ABSL_LOG(INFO) << "litert model size: " << buffer->size();
   auto buffer_ref = BufferRef<uint8_t>(buffer->data(), buffer->size());

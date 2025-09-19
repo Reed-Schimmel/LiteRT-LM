@@ -27,6 +27,7 @@
 #include "absl/log/log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
 #include "runtime/components/model_resources.h"
@@ -87,120 +88,26 @@ class EngineImpl : public Engine {
   ~EngineImpl() override {
     ABSL_QCHECK_OK(WaitUntilDone(Engine::kDefaultTimeout));
   }
-
-  explicit EngineImpl(EngineSettings engine_settings)
-      : engine_settings_(std::move(engine_settings)) {
-    if (engine_settings_.IsBenchmarkEnabled()) {
-      benchmark_info_ = std::make_optional<BenchmarkInfo>(
-          engine_settings_.GetBenchmarkParams().value());
-      ABSL_CHECK_OK(
-          benchmark_info_->TimeInitPhaseStart("Executor initialization"));
-    }
-    const auto& model_assets =
-        engine_settings_.GetMutableMainExecutorSettings().GetModelAssets();
-
-    auto model_resources = BuildLiteRtCompiledModelResources(model_assets);
-    ABSL_CHECK_OK(model_resources);
-    litert_model_resources_ = std::move(*model_resources);
-    auto scoped_file = model_assets.GetOrCreateScopedFile();
-    ABSL_CHECK_OK(scoped_file);
-
-    auto file_format = GetFileFormat(/*model_path=*/"", *scoped_file);
-    ABSL_CHECK_OK(file_format);
-    // TODO(b/397975034): factor out the tokenizer creation logic once the
-    // model loading mechanism of the new file format is determined.
-    if (*file_format != FileFormat::TASK &&
-        *file_format != FileFormat::LITERT_LM) {
-      ABSL_LOG(FATAL) << "Not supported file format: " << *file_format;
-    }
-    auto tokenizer = litert_model_resources_->GetTokenizer();
-    ABSL_CHECK_OK(tokenizer) << tokenizer.status();
-    auto llm_metadata = litert_model_resources_->GetLlmMetadata();
-    ABSL_CHECK_OK(llm_metadata) << llm_metadata.status();
-    // Update and load the parameters from the model file and convert the
-    // tokens to ids.
-    ABSL_CHECK_OK(
-        engine_settings_.MaybeUpdateAndValidate(**tokenizer, *llm_metadata));
-
-    if ((engine_settings_.GetMainExecutorSettings().GetBackend() ==
-         Backend::CPU) ||
-        (engine_settings_.GetMainExecutorSettings().GetBackend() ==
-         Backend::GPU)) {
-      auto executor = BuildLitertCompiledModelExecutor(
-          engine_settings_.GetMainExecutorSettings(), *litert_model_resources_);
-      ABSL_QCHECK_OK(executor);
-      executor_ = std::move(*executor);
-    } else {
-      std::string model_path(engine_settings_.GetMainExecutorSettings()
-                                 .GetModelAssets()
-                                 .GetPath()
-                                 .value_or(""));
-
-      std::filesystem::path path(model_path);
-      ABSL_CHECK(std::filesystem::exists(path));
-      auto executor = LlmLiteRtNpuCompiledModelExecutor::Create(
-          engine_settings_.GetMainExecutorSettings(), *litert_model_resources_,
-          path.parent_path().string());
-      ABSL_CHECK_OK(executor);
-      executor_ = std::move(executor.value());
-    }
-
-    // TODO - b/436674053: Modularize the executor creation logic into a
-    // separate executor class, and have unit test for it.
-    if (engine_settings_.GetVisionExecutorSettings().has_value()) {
-      auto vision_executor_settings = VisionExecutorSettings::CreateDefault(
-          engine_settings_.GetMainExecutorSettings().GetModelAssets(),
-          /*encoder_backend=*/
-          engine_settings_.GetVisionExecutorSettings()->GetBackend(),
-          /*adapter_backend=*/Backend::CPU);
-      ABSL_QCHECK_OK(vision_executor_settings);
-      auto vision_executor =
-          VisionLiteRtCompiledModelExecutor::Create(*vision_executor_settings);
-      ABSL_QCHECK_OK(vision_executor);
-      vision_executor_ = std::move(*vision_executor);
-
-      // Create the image preprocessor for processing the image input only if
-      // vision executor is enabled.
-      image_preprocessor_ = std::make_unique<StbImagePreprocessor>();
-    }
-
-    if (engine_settings_.GetAudioExecutorSettings().has_value()) {
-      auto audio_encoder_model = litert_model_resources_->GetTFLiteModel(
-          ModelType::kTfLiteAudioEncoderHw);
-      auto audio_adapter_model = litert_model_resources_->GetTFLiteModel(
-          ModelType::kTfLiteAudioAdapter);
-      if (audio_encoder_model.ok() && audio_adapter_model.ok()) {
-        auto audio_executor_settings = AudioExecutorSettings::CreateDefault(
-            engine_settings_.GetMainExecutorSettings().GetModelAssets(),
-            engine_settings_.GetMainExecutorSettings().GetMaxNumTokens(),
-            engine_settings_.GetAudioExecutorSettings()->GetBackend());
-        ABSL_QCHECK_OK(audio_executor_settings);
-        auto audio_executor = BuildAudioExecutor(*audio_executor_settings);
-        ABSL_QCHECK_OK(audio_executor);
-        audio_executor_ = std::move(*audio_executor);
-        auto audio_preprocessor = AudioPreprocessorMiniAudio::Create(
-            AudioPreprocessorConfig::CreateDefaultUsmConfig());
-        ABSL_QCHECK_OK(audio_preprocessor);
-        audio_preprocessor_ = std::move(*audio_preprocessor);
-      }
-    }
-
-    if (benchmark_info_.has_value()) {
-      ABSL_CHECK_OK(
-          benchmark_info_->TimeInitPhaseEnd("Executor initialization"));
-      ABSL_CHECK_OK(
-          benchmark_info_->TimeInitPhaseStart("Tokenizer initialization"));
-    }
-
-    if (benchmark_info_.has_value()) {
-      ABSL_CHECK_OK(
-          benchmark_info_->TimeInitPhaseEnd("Tokenizer initialization"));
-    }
-
-    // Creating the thread pool of a single thread to execute the works.
-    worker_thread_pool_ = std::make_unique<ThreadPool>(/*name_prefix=*/"engine",
-                                                       /*max_num_threads=*/1);
-  }
+  explicit EngineImpl(EngineSettings engine_settings,
+                      std::unique_ptr<ModelResources> litert_model_resources,
+                      std::unique_ptr<ImagePreprocessor> image_preprocessor,
+                      std::unique_ptr<LlmExecutor> executor,
+                      std::unique_ptr<VisionExecutor> vision_executor,
+                      std::unique_ptr<AudioPreprocessor> audio_preprocessor,
+                      std::unique_ptr<AudioExecutor> audio_executor,
+                      std::optional<BenchmarkInfo> benchmark_info,
+                      std::unique_ptr<ThreadPool> worker_thread_pool)
+      : engine_settings_(std::move(engine_settings)),
+        litert_model_resources_(std::move(litert_model_resources)),
+        image_preprocessor_(std::move(image_preprocessor)),
+        executor_(std::move(executor)),
+        vision_executor_(std::move(vision_executor)),
+        stop_token_ids_(),
+        sampler_params_(),
+        audio_preprocessor_(std::move(audio_preprocessor)),
+        audio_executor_(std::move(audio_executor)),
+        benchmark_info_(std::move(benchmark_info)),
+        worker_thread_pool_(std::move(worker_thread_pool)) {}
 
   // Method to create the Session.
   absl::StatusOr<std::unique_ptr<Session>> CreateSession(
@@ -251,8 +158,119 @@ class EngineImpl : public Engine {
 
 // Method to create Engine.
 absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
-    EngineSettings settings_struct) {
-  auto llm_impl = std::make_unique<EngineImpl>(std::move(settings_struct));
+    EngineSettings engine_settings) {
+  std::optional<BenchmarkInfo> benchmark_info;
+  if (engine_settings.IsBenchmarkEnabled()) {
+    benchmark_info = std::make_optional<BenchmarkInfo>(
+        engine_settings.GetBenchmarkParams().value());
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseStart("Executor initialization"));
+  }
+  const auto& model_assets =
+      engine_settings.GetMutableMainExecutorSettings().GetModelAssets();
+
+  ASSIGN_OR_RETURN(auto model_resources,
+                   BuildLiteRtCompiledModelResources(model_assets));
+  ASSIGN_OR_RETURN(auto scoped_file, model_assets.GetOrCreateScopedFile());
+  ASSIGN_OR_RETURN(auto file_format,
+                   GetFileFormat(/*model_path=*/"", scoped_file));
+
+  // TODO(b/397975034): factor out the tokenizer creation logic once the
+  // model loading mechanism of the new file format is determined.
+  if (file_format != FileFormat::TASK && file_format != FileFormat::LITERT_LM) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Not supported file format: ", file_format));
+  }
+  ASSIGN_OR_RETURN(auto* tokenizer, model_resources->GetTokenizer());
+  ASSIGN_OR_RETURN(auto* llm_metadata, model_resources->GetLlmMetadata());
+
+  // Update and load the parameters from the model file and convert the
+  // tokens to ids.
+  RETURN_IF_ERROR(
+      engine_settings.MaybeUpdateAndValidate(*tokenizer, llm_metadata));
+
+  std::unique_ptr<LlmExecutor> executor;
+  if ((engine_settings.GetMainExecutorSettings().GetBackend() ==
+       Backend::CPU) ||
+      (engine_settings.GetMainExecutorSettings().GetBackend() ==
+       Backend::GPU)) {
+    ASSIGN_OR_RETURN(executor, BuildLitertCompiledModelExecutor(
+                                   engine_settings.GetMainExecutorSettings(),
+                                   *model_resources));
+  } else {
+    std::string model_path(engine_settings.GetMainExecutorSettings()
+                               .GetModelAssets()
+                               .GetPath()
+                               .value_or(""));
+    std::filesystem::path path(model_path);
+    if (!std::filesystem::exists(path)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Model file not found: ", path.parent_path().string()));
+    }
+    ASSIGN_OR_RETURN(executor,
+                     LlmLiteRtNpuCompiledModelExecutor::Create(
+                         engine_settings.GetMainExecutorSettings(),
+                         *model_resources, path.parent_path().string()));
+  }
+
+  // TODO - b/436674053: Modularize the executor creation logic into a
+  // separate executor class, and have unit test for it.
+  std::unique_ptr<VisionExecutor> vision_executor;
+  std::unique_ptr<ImagePreprocessor> image_preprocessor;
+  if (engine_settings.GetVisionExecutorSettings().has_value()) {
+    ASSIGN_OR_RETURN(
+        auto vision_executor_settings,
+        VisionExecutorSettings::CreateDefault(
+            engine_settings.GetMainExecutorSettings().GetModelAssets(),
+            /*encoder_backend=*/
+            engine_settings.GetVisionExecutorSettings()->GetBackend(),
+            /*adapter_backend=*/Backend::CPU));
+    ASSIGN_OR_RETURN(vision_executor, VisionLiteRtCompiledModelExecutor::Create(
+                                          vision_executor_settings));
+    // Create the image preprocessor for processing the image input only if
+    // vision executor is enabled.
+    image_preprocessor = std::make_unique<StbImagePreprocessor>();
+  }
+
+  std::unique_ptr<AudioExecutor> audio_executor;
+  std::unique_ptr<AudioPreprocessor> audio_preprocessor;
+  if (engine_settings.GetAudioExecutorSettings().has_value()) {
+    ASSIGN_OR_RETURN(
+        auto audio_executor_settings,
+        AudioExecutorSettings::CreateDefault(
+            engine_settings.GetMainExecutorSettings().GetModelAssets(),
+            engine_settings.GetMainExecutorSettings().GetMaxNumTokens(),
+            engine_settings.GetAudioExecutorSettings()->GetBackend()));
+    ASSIGN_OR_RETURN(audio_executor,
+                     BuildAudioExecutor(audio_executor_settings));
+    ASSIGN_OR_RETURN(audio_preprocessor,
+                     AudioPreprocessorMiniAudio::Create(
+                         AudioPreprocessorConfig::CreateDefaultUsmConfig()));
+  }
+
+  if (benchmark_info.has_value()) {
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseEnd("Executor initialization"));
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));
+  }
+
+  if (benchmark_info.has_value()) {
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseEnd("Tokenizer initialization"));
+  }
+
+  // Creating the thread pool of a single thread to execute the works.
+  auto worker_thread_pool =
+      std::make_unique<ThreadPool>(/*name_prefix=*/"engine",
+                                   /*max_num_threads=*/1);
+
+  auto llm_impl = std::make_unique<EngineImpl>(
+      std::move(engine_settings), std::move(model_resources),
+      std::move(image_preprocessor), std::move(executor),
+      std::move(vision_executor), std::move(audio_preprocessor),
+      std::move(audio_executor), std::move(benchmark_info),
+      std::move(worker_thread_pool));
   return llm_impl;
 };
 
