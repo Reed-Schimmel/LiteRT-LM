@@ -454,6 +454,34 @@ cc_test(
 )
 
 cc_library(
+    name = "lora_util",
+    srcs = ["lora_util.cc"],
+    hdrs = ["lora_util.h"],
+    deps = [
+        ":litert_status_util",
+        ":memory_mapped_file",
+        ":scoped_file",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+    ],
+)
+
+cc_test(
+    name = "lora_util_test",
+    srcs = ["lora_util_test.cc"],
+    deps = [
+        ":lora_util",
+        ":memory_mapped_file",
+        ":scoped_file",
+        ":test_utils",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+    ],
+)
+
+cc_library(
     name = "model_type_utils",
     srcs = ["model_type_utils.cc"],
     hdrs = ["model_type_utils.h"],
