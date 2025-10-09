@@ -527,3 +527,42 @@ cc_test(
         "//runtime/util:test_utils",
     ],
 )
+
+cc_library(
+    name = "lora",
+    srcs = ["lora.cc"],
+    hdrs = ["lora.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+        "@litert//litert/cc:litert_compiled_model",
+        "@litert//litert/cc:litert_model",
+        "@litert//litert/cc:litert_tensor_buffer",
+        "//runtime/util:litert_status_util",
+        "//runtime/util:lora_data",
+        "//runtime/util:lora_util",
+    ],
+)
+
+cc_test(
+    name = "lora_test",
+    srcs = ["lora_test.cc"],
+    data = ["//runtime/testdata"],
+    deps = [
+        ":lora",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "@litert//litert/c:litert_common",
+        "@litert//litert/cc:litert_compiled_model",
+        "@litert//litert/cc:litert_environment",
+        "@litert//litert/cc:litert_model",
+        "@litert//litert/cc:litert_options",
+        "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/test:matchers",
+        "//runtime/util:lora_data",
+        "//runtime/util:test_utils",
+    ],
+)
