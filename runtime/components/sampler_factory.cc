@@ -243,8 +243,15 @@ class TopKWebGpuCApiSampler : public TopKCApiSampler {
       std::optional<ActivationDataType> activation_data_type,
       proto::SamplerParameters sampler_params) {
     std::unique_ptr<TopKSamplerCApi> capi;
+#if defined(_WIN32)
+#define SO_EXT ".dll"
+#elif defined(__APPLE__)
+#define SO_EXT ".dylib"
+#else
+#define SO_EXT ".so"
+#endif
     auto capi_or = GetSamplerCApi(
-        "libLiteRtTopKWebGpuSampler.so", "LiteRtTopKWebGpuSampler_Create",
+        "libLiteRtTopKWebGpuSampler" SO_EXT, "LiteRtTopKWebGpuSampler_Create",
         "LiteRtTopKWebGpuSampler_Destroy",
         "LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer");
     if (capi_or.ok()) {
