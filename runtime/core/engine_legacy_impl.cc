@@ -214,20 +214,21 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
     RETURN_IF_ERROR(
         benchmark_info->TimeInitPhaseStart("Executor initialization"));
   }
+  ASSIGN_OR_RETURN(auto scoped_model_file,
+                   engine_settings.GetMainExecutorSettings()
+                       .GetModelAssets()
+                       .GetOrCreateScopedFile());
   ASSIGN_OR_RETURN(
-      auto model_path,
-      engine_settings.GetMainExecutorSettings().GetModelAssets().GetPath());
-  ASSIGN_OR_RETURN(auto model_resources,
-                   oi::BuildModelResources(std::string(model_path)));
+      auto model_resources,
+      oi::BuildModelResources(/*model_path=*/"", scoped_model_file));
 
   proto::LlmMetadata llm_metadata;
   std::unique_ptr<Tokenizer> task_tokenizer;
   Tokenizer* tokenizer = nullptr;
   if (model_resources->litert_lm_model_resources == nullptr) {
     // Handle the .task file format.
-    ASSIGN_OR_RETURN(auto scoped_file, ScopedFile::Open(model_path));
     ASSIGN_OR_RETURN(auto resources, ModelAssetBundleResources::Create(
-                                         /*tag=*/"", std::move(scoped_file)));
+                                         /*tag=*/"", scoped_model_file));
     if (benchmark_info.has_value()) {
       RETURN_IF_ERROR(
           benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));

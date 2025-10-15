@@ -14,8 +14,10 @@
 
 #include <cstdlib>
 #include <filesystem>  // NOLINT: Required for path manipulation.
+#include <fstream>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <gmock/gmock.h>
@@ -31,6 +33,7 @@
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/llm_executor_settings.h"
 #include "runtime/proto/sampler_params.pb.h"
+#include "runtime/util/scoped_file.h"
 #include "runtime/util/test_utils.h"  // NOLINT
 
 namespace litert::lm {
@@ -149,6 +152,57 @@ TEST(EngineTest, CreateEngine_WithCache) {
   ABSL_CHECK_OK((*session)->RunPrefill(inputs));
 
   responses = (*session)->RunDecode();
+  EXPECT_OK(responses);
+  EXPECT_EQ(responses->GetNumOutputCandidates(), 1);
+  EXPECT_FALSE(responses->GetResponseTextAt(0)->empty());
+}
+
+TEST(EngineTest, CreateEngine_WithModelAndCacheFromFileDescriptor) {
+  auto cache_path = std::filesystem::path(::testing::TempDir()) /
+                    absl::StrCat("cache-", std::rand(), ".cache");
+  std::filesystem::remove_all(cache_path);
+  {
+    // Create an empty file - ScopedFile expects the file to exist.
+    std::ofstream cache_file(cache_path.string());
+  }
+  absl::Cleanup remove_cache = [cache_path] {
+    std::filesystem::remove_all(cache_path);
+  };
+  ASSERT_OK_AND_ASSIGN(auto scoped_cache_file,
+                       ScopedFile::OpenWritable(cache_path.string()));
+  auto shared_scoped_cache_file =
+      std::make_shared<ScopedFile>(std::move(scoped_cache_file));
+
+  auto task_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm_new_metadata.task";
+  ASSERT_OK_AND_ASSIGN(auto task_descriptor,
+                       ScopedFile::Open(task_path.string()));
+  auto shared_task_descriptor =
+      std::make_shared<ScopedFile>(std::move(task_descriptor));
+  auto model_assets = ModelAssets::Create(shared_task_descriptor);
+  ASSERT_OK(model_assets);
+  auto engine_settings =
+      EngineSettings::CreateDefault(*model_assets, Backend::CPU);
+  ASSERT_OK(engine_settings);
+  engine_settings->GetMutableMainExecutorSettings().SetMaxNumTokens(
+      kMaxNumTokens);
+  engine_settings->GetMutableMainExecutorSettings().SetScopedCacheFile(
+      shared_scoped_cache_file);
+
+  absl::StatusOr<std::unique_ptr<Engine>> llm =
+      Engine::CreateEngine(*engine_settings);
+  ABSL_CHECK_OK(llm);
+
+  absl::StatusOr<std::unique_ptr<Engine::Session>> session =
+      (*llm)->CreateSession(SessionConfig::CreateDefault());
+  ABSL_CHECK_OK(session);
+
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello world!"));
+  ABSL_CHECK_OK((*session)->RunPrefill(inputs));
+
+  auto responses = (*session)->RunDecode();
   EXPECT_OK(responses);
   EXPECT_EQ(responses->GetNumOutputCandidates(), 1);
   EXPECT_FALSE(responses->GetResponseTextAt(0)->empty());

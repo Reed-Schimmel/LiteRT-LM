@@ -87,6 +87,7 @@ cc_test(
         "//runtime/executor:executor_settings_base",
         "//runtime/executor:llm_executor_settings",
         "//runtime/proto:sampler_params_cc_proto",
+        "//runtime/util:scoped_file",
         "//runtime/util:test_utils",
     ],
 )

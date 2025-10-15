@@ -392,8 +392,13 @@ BuildLiteRtCompiledModelResources(const ModelAssets& model_assets) {
       return absl::InvalidArgumentError("Unsupported file format.");
     case FileFormat::TASK:
       return BuildModelResourcesFromTaskFormat(std::move(scoped_file));
-    case FileFormat::LITERT_LM:
-      return BuildModelResourcesFromLitertLmFormat(std::move(*scoped_file));
+    case FileFormat::LITERT_LM: {
+      // `BuildModelResourcesFromLitertLmFormat` expects a ScopedFile that it
+      // takes ownership of, so we need to duplicate the ScopedFile to keep
+      // the original alive.
+      ASSIGN_OR_RETURN(auto duplicate_file, scoped_file->Duplicate());
+      return BuildModelResourcesFromLitertLmFormat(std::move(duplicate_file));
+    }
   }
 }
 

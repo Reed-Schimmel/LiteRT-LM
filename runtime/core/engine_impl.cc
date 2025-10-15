@@ -64,10 +64,6 @@ namespace {
 // Builds the LiteRT compiled model executor.
 absl::StatusOr<std::unique_ptr<LlmExecutor>> BuildLitertCompiledModelExecutor(
     LlmExecutorSettings executor_settings, ModelResources& model_resources) {
-  if (executor_settings.GetModelAssets().HasScopedFile()) {
-    return absl::InvalidArgumentError("Model must be passed as a single path.");
-  }
-
   // Create executor that creates and owns the interpreter and kv cache.
   return LlmLiteRtCompiledModelExecutor::Create(std::move(executor_settings),
                                                 model_resources);
