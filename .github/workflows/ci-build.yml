@@ -103,7 +103,8 @@ jobs:
             //runtime/engine:litert_lm_main
 
       - name: Check if litert_lm_main has only LiteRt symbols undefined.
-        # Return exit code 1 if libLiteRtRuntimeCApi.so has LiteRt symbols except for LiteRtTopK.
+        # Return exit code 1 if libLiteRtRuntimeCApi.so has LiteRt symbols except for LiteRtTopK
+        # and some exceptions listed explictly here.
         run: |
           ! readelf -sW bazel-bin/runtime/engine/litert_lm_main \
             | grep " LiteRt" | grep -v " UND LiteRt" | grep -v " LiteRtTopK" \
