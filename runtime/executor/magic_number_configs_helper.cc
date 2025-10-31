@@ -36,6 +36,8 @@
 namespace litert::lm {
 namespace {
 
+using Signature = ::litert::SimpleSignature;
+
 struct MagicNumbers {
   int64_t context_length = 0;
   std::vector<int64_t> prefill_lengths;
