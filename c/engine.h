@@ -37,6 +37,12 @@ typedef struct LiteRtLmEngineSettings LiteRtLmEngineSettings;
 // Opaque pointer for the LiteRT LM Benchmark Info.
 typedef struct LiteRtLmBenchmarkInfo LiteRtLmBenchmarkInfo;
 
+// Opaque pointer for the LiteRT LM Conversation.
+typedef struct LiteRtLmConversation LiteRtLmConversation;
+
+// Opaque pointer for a JSON response.
+typedef struct LiteRtLmJsonResponse LiteRtLmJsonResponse;
+
 // Sets the minimum log level for the LiteRT LM library.
 // Log levels are: 0=INFO, 1=WARNING, 2=ERROR, 3=FATAL.
 void litert_lm_set_min_log_level(int level);
@@ -221,6 +227,66 @@ int litert_lm_session_generate_content_stream(LiteRtLmSession* session,
                                               size_t num_inputs,
                                               LiteRtLmStreamCallback callback,
                                               void* callback_data);
+
+// Creates a LiteRT LM Conversation. The caller is responsible for destroying
+// the conversation using `litert_lm_conversation_delete`.
+//
+// @param engine The engine to create the conversation from.
+// @return A pointer to the created conversation, or NULL on failure.
+LiteRtLmConversation* litert_lm_conversation_create(LiteRtLmEngine* engine);
+
+// Destroys a LiteRT LM Conversation.
+//
+// @param conversation The conversation to destroy.
+void litert_lm_conversation_delete(LiteRtLmConversation* conversation);
+
+// Sends a message to the conversation and returns the response.
+// This is a blocking call.
+//
+// @param conversation The conversation to use.
+// @param message_json A JSON string representing the message to send.
+// @return A pointer to the JSON response, or NULL on failure. The caller is
+//   responsible for deleting the response using
+//   `litert_lm_json_response_delete`.
+LiteRtLmJsonResponse* litert_lm_conversation_send_message(
+    LiteRtLmConversation* conversation, const char* message_json);
+
+// Destroys a LiteRT LM Json Response object.
+//
+// @param response The response to destroy.
+void litert_lm_json_response_delete(LiteRtLmJsonResponse* response);
+
+// Returns the JSON response string from a response object.
+//
+// @param response The response object.
+// @return The response JSON string. The returned string is owned by the
+//   `response` object and is valid only for its lifetime. Returns NULL if
+//   response is NULL.
+const char* litert_lm_json_response_get_string(
+    const LiteRtLmJsonResponse* response);
+
+// Sends a message to the conversation and streams the response via a
+// callback. This is a non-blocking call that will invoke the callback from a
+// background thread for each chunk.
+//
+// @param conversation The conversation to use.
+// @param message_json A JSON string representing the message to send.
+// @param callback The callback function to receive response chunks.
+// @param callback_data A pointer to user data that will be passed to the
+// callback.
+// @return 0 on success, non-zero on failure to start the stream.
+int litert_lm_conversation_send_message_stream(
+    LiteRtLmConversation* conversation, const char* message_json,
+    LiteRtLmStreamCallback callback, void* callback_data);
+
+// Retrieves the benchmark information from the conversation. The caller is
+// responsible for destroying the benchmark info using
+// `litert_lm_benchmark_info_delete`.
+//
+// @param conversation The conversation to get the benchmark info from.
+// @return A pointer to the benchmark info, or NULL on failure.
+LiteRtLmBenchmarkInfo* litert_lm_conversation_get_benchmark_info(
+    LiteRtLmConversation* conversation);
 
 #ifdef __cplusplus
 }  // extern "C"

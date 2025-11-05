@@ -26,6 +26,9 @@
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
+#include "nlohmann/json.hpp"  // from @nlohmann_json
+#include "runtime/conversation/conversation.h"
+#include "runtime/conversation/io_types.h"
 #include "runtime/engine/engine.h"
 #include "runtime/engine/engine_settings.h"
 #include "runtime/engine/io_types.h"
@@ -54,11 +57,38 @@ absl::AnyInvocable<void(absl::StatusOr<litert::lm::Responses>)> CreateCallback(
   };
 }
 
+absl::AnyInvocable<void(absl::StatusOr<litert::lm::Message>)>
+CreateConversationCallback(LiteRtLmStreamCallback callback, void* user_data) {
+  return [callback, user_data](absl::StatusOr<litert::lm::Message> message) {
+    if (!message.ok()) {
+      std::string error_str = message.status().ToString();
+      callback(user_data, nullptr, true, const_cast<char*>(error_str.c_str()));
+      return;
+    }
+    if (auto* json_msg = std::get_if<litert::lm::JsonMessage>(&*message)) {
+      if (json_msg->is_null()) {  // End of stream marker
+        callback(user_data, nullptr, true, nullptr);
+      } else {
+        std::string json_str = json_msg->dump();
+        callback(user_data, const_cast<char*>(json_str.c_str()), false,
+                 nullptr);
+      }
+    } else {
+      std::string error_str = "Unsupported message type";
+      callback(user_data, nullptr, true, const_cast<char*>(error_str.c_str()));
+    }
+  };
+}
+
 }  // namespace
 
+using ::litert::lm::Conversation;
+using ::litert::lm::ConversationConfig;
 using ::litert::lm::Engine;
 using ::litert::lm::EngineSettings;
 using ::litert::lm::InputText;
+using ::litert::lm::JsonMessage;
+using ::litert::lm::Message;
 using ::litert::lm::ModelAssets;
 using ::litert::lm::Responses;
 using ::litert::lm::SessionConfig;
@@ -81,6 +111,14 @@ struct LiteRtLmResponses {
 
 struct LiteRtLmBenchmarkInfo {
   litert::lm::BenchmarkInfo benchmark_info;
+};
+
+struct LiteRtLmConversation {
+  std::unique_ptr<Conversation> conversation;
+};
+
+struct LiteRtLmJsonResponse {
+  std::string json_string;
 };
 
 extern "C" {
@@ -322,6 +360,109 @@ double litert_lm_benchmark_info_get_decode_tokens_per_sec_at(
     return 0.0;
   }
   return benchmark_info->benchmark_info.GetDecodeTokensPerSec(index);
+}
+
+LiteRtLmConversation* litert_lm_conversation_create(LiteRtLmEngine* engine) {
+  if (!engine || !engine->engine) {
+    return nullptr;
+  }
+  auto conversation_config = ConversationConfig::CreateDefault(*engine->engine);
+  if (!conversation_config.ok()) {
+    ABSL_LOG(ERROR) << "Failed to create conversation config: "
+                    << conversation_config.status();
+    return nullptr;
+  }
+  auto conversation =
+      Conversation::Create(*engine->engine, *conversation_config);
+  if (!conversation.ok()) {
+    ABSL_LOG(ERROR) << "Failed to create conversation: "
+                    << conversation.status();
+    return nullptr;
+  }
+  auto* c_conversation = new LiteRtLmConversation;
+  c_conversation->conversation = *std::move(conversation);
+  return c_conversation;
+}
+
+void litert_lm_conversation_delete(LiteRtLmConversation* conversation) {
+  delete conversation;
+}
+
+LiteRtLmJsonResponse* litert_lm_conversation_send_message(
+    LiteRtLmConversation* conversation, const char* message_json) {
+  if (!conversation || !conversation->conversation) {
+    return nullptr;
+  }
+  nlohmann::json json_message =
+      nlohmann::json::parse(message_json, /*cb=*/nullptr,
+                            /*allow_exceptions=*/false);
+  if (json_message.is_discarded()) {
+    ABSL_LOG(ERROR) << "Failed to parse message JSON.";
+    return nullptr;
+  }
+  auto response = conversation->conversation->SendMessage(json_message);
+  if (!response.ok()) {
+    ABSL_LOG(ERROR) << "Failed to send message: " << response.status();
+    return nullptr;
+  }
+  auto* json_response = std::get_if<JsonMessage>(&*response);
+  if (!json_response) {
+    ABSL_LOG(ERROR) << "Response is not a JSON message.";
+    return nullptr;
+  }
+  auto* c_response = new LiteRtLmJsonResponse;
+  c_response->json_string = json_response->dump();
+  return c_response;
+}
+
+void litert_lm_json_response_delete(LiteRtLmJsonResponse* response) {
+  delete response;
+}
+
+const char* litert_lm_json_response_get_string(
+    const LiteRtLmJsonResponse* response) {
+  if (!response) {
+    return nullptr;
+  }
+  return response->json_string.c_str();
+}
+
+int litert_lm_conversation_send_message_stream(
+    LiteRtLmConversation* conversation, const char* message_json,
+    LiteRtLmStreamCallback callback, void* callback_data) {
+  if (!conversation || !conversation->conversation) {
+    return -1;
+  }
+  nlohmann::json json_message =
+      nlohmann::json::parse(message_json, /*cb=*/nullptr,
+                            /*allow_exceptions=*/false);
+  if (json_message.is_discarded()) {
+    ABSL_LOG(ERROR) << "Failed to parse message JSON.";
+    return -1;
+  }
+
+  absl::Status status = conversation->conversation->SendMessageAsync(
+      json_message, CreateConversationCallback(callback, callback_data));
+
+  if (!status.ok()) {
+    ABSL_LOG(ERROR) << "Failed to start message stream: " << status;
+    return static_cast<int>(status.code());
+  }
+  return 0;
+}
+
+LiteRtLmBenchmarkInfo* litert_lm_conversation_get_benchmark_info(
+    LiteRtLmConversation* conversation) {
+  if (!conversation || !conversation->conversation) {
+    return nullptr;
+  }
+  auto benchmark_info = conversation->conversation->GetBenchmarkInfo();
+  if (!benchmark_info.ok()) {
+    ABSL_LOG(ERROR) << "Failed to get benchmark info: "
+                    << benchmark_info.status();
+    return nullptr;
+  }
+  return new LiteRtLmBenchmarkInfo{std::move(*benchmark_info)};
 }
 
 }  // extern "C"

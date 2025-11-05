@@ -31,6 +31,13 @@ using SessionPtr =
     std::unique_ptr<LiteRtLmSession, decltype(&litert_lm_session_delete)>;
 using ResponsesPtr =
     std::unique_ptr<LiteRtLmResponses, decltype(&litert_lm_responses_delete)>;
+using ConversationPtr =
+    std::unique_ptr<LiteRtLmConversation,
+                    decltype(&litert_lm_conversation_delete)>;
+using JsonResponsePtr =
+    std::unique_ptr<LiteRtLmJsonResponse,
+                    decltype(&litert_lm_json_response_delete)>;
+
 TEST(EngineCTest, GenerateContent) {
   const std::string task_path = GetTestdataPath(
       "litert_lm/runtime/testdata/test_lm_new_metadata.task");
@@ -64,6 +71,36 @@ TEST(EngineCTest, GenerateContent) {
       litert_lm_responses_get_response_text_at(responses.get(), 0);
   ASSERT_NE(response_text, nullptr);
   EXPECT_GT(strlen(response_text), 0);
+}
+
+TEST(EngineCTest, ConversationSendMessage) {
+  const std::string task_path = GetTestdataPath(
+      "litert_lm/runtime/testdata/test_lm_new_metadata.task");
+
+  EngineSettingsPtr settings(
+      litert_lm_engine_settings_create(task_path.c_str(), "cpu"),
+      &litert_lm_engine_settings_delete);
+  ASSERT_NE(settings, nullptr);
+  litert_lm_engine_settings_set_max_num_tokens(settings.get(), 16);
+
+  EnginePtr engine(litert_lm_engine_create(settings.get()),
+                   &litert_lm_engine_delete);
+  ASSERT_NE(engine, nullptr);
+
+  ConversationPtr conversation(litert_lm_conversation_create(engine.get()),
+                               &litert_lm_conversation_delete);
+  ASSERT_NE(conversation, nullptr);
+
+  const char* message_json =
+      R"({"role": "user", "content": [{"type": "text", "text": "Hello"}]})";
+  JsonResponsePtr response(
+      litert_lm_conversation_send_message(conversation.get(), message_json),
+      &litert_lm_json_response_delete);
+  ASSERT_NE(response, nullptr);
+
+  const char* response_str = litert_lm_json_response_get_string(response.get());
+  ASSERT_NE(response_str, nullptr);
+  EXPECT_GT(strlen(response_str), 0);
 }
 
 struct StreamCallbackData {
@@ -124,6 +161,35 @@ TEST(EngineCTest, GenerateContentStream) {
                      absl_testing::StatusIs(
                      absl::StatusCode::kInternal,
                      testing::HasSubstr("Maximum kv-cache size reached."))));
+  EXPECT_GT(callback_data.response.length(), 0);
+}
+
+TEST(EngineCTest, ConversationSendMessageStream) {
+  const std::string task_path = GetTestdataPath(
+      "litert_lm/runtime/testdata/test_lm_new_metadata.task");
+
+  EngineSettingsPtr settings(
+      litert_lm_engine_settings_create(task_path.c_str(), "cpu"),
+      &litert_lm_engine_settings_delete);
+  ASSERT_NE(settings, nullptr);
+  litert_lm_engine_settings_set_max_num_tokens(settings.get(), 16);
+
+  EnginePtr engine(litert_lm_engine_create(settings.get()),
+                   &litert_lm_engine_delete);
+  ASSERT_NE(engine, nullptr);
+
+  ConversationPtr conversation(litert_lm_conversation_create(engine.get()),
+                               &litert_lm_conversation_delete);
+  ASSERT_NE(conversation, nullptr);
+
+  const char* message_json =
+      R"({"role": "user", "content": [{"type": "text", "text": "Hello"}]})";
+  StreamCallbackData callback_data;
+  int result = litert_lm_conversation_send_message_stream(
+      conversation.get(), message_json, &StreamCallback, &callback_data);
+  ASSERT_EQ(result, 0);
+
+  callback_data.done.WaitForNotification();
   EXPECT_GT(callback_data.response.length(), 0);
 }
 
