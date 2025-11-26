@@ -27,8 +27,7 @@ namespace litert::lm {
 // configs. The DataProcessorConfig is used to initialize the
 // ModelDataProcessor.
 using DataProcessorConfig =
-    std::variant<std::monostate, GenericDataProcessorConfig,
-                 Gemma3DataProcessorConfig,
+    std::variant<Gemma3DataProcessorConfig, GenericDataProcessorConfig,
                  Qwen3DataProcessorConfig
                  >;
 
