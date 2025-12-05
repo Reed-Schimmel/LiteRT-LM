@@ -143,13 +143,6 @@ MATCHER_P(HasInputAudio, audio_input, "") {
   return true;
 }
 
-MATCHER(HasInputAudioEnd, "") {
-  if (!std::holds_alternative<InputAudioEnd>(arg)) {
-    return false;
-  }
-  return true;
-}
-
 class Gemma3DataProcessorTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -1037,11 +1030,10 @@ TEST_F(Gemma3DataProcessorTest, ToInputDataVectorTextAndAudio) {
       audio_preprocessor->Preprocess(InputAudio(ReadFile(audio_path))));
   InputText expected_text2("\n\n");
   InputText expected_text3("<end_of_turn>");
-  EXPECT_THAT(
-      input_data,
-      ElementsAre(HasInputText(&expected_text1), HasInputAudio(&expected_audio),
-                  HasInputAudioEnd(), HasInputText(&expected_text2),
-                  HasInputText(&expected_text3)));
+  EXPECT_THAT(input_data, ElementsAre(HasInputText(&expected_text1),
+                                      HasInputAudio(&expected_audio),
+                                      HasInputText(&expected_text2),
+                                      HasInputText(&expected_text3)));
 }
 
 TEST_F(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndAudio) {
@@ -1103,9 +1095,8 @@ I am doing well, thanks for asking.<end_of_turn>
   EXPECT_THAT(
       input_data,
       ElementsAre(HasInputText(&expected_text1), HasInputAudio(&expected_audio),
-                  HasInputAudioEnd(), HasInputText(&expected_text2),
-                  HasInputText(&expected_text3), HasInputAudio(&expected_audio),
-                  HasInputAudioEnd(), HasInputText(&expected_text4),
+                  HasInputText(&expected_text2), HasInputText(&expected_text3),
+                  HasInputAudio(&expected_audio), HasInputText(&expected_text4),
                   HasInputText(&expected_text5)));
 }
 

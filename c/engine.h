@@ -109,7 +109,6 @@ typedef enum {
   kInputText,
   kInputImage,
   kInputAudio,
-  kInputAudioEnd,
 } InputDataType;
 
 // Represents a single piece of input data.

@@ -190,9 +190,6 @@ absl::StatusOr<std::vector<InputData>> PreprocessContents(
         return absl::InternalError(
             "Audio must be preprocessed before being used in SessionAdvanced.");
       }
-    } else if (const auto* input_audio_end =
-                   std::get_if<InputAudioEnd>(&content)) {
-      preprocessed_contents.emplace_back(InputAudioEnd());
     }
   }
   return preprocessed_contents;
