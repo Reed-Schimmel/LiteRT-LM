@@ -28,7 +28,6 @@
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/components/tool_use/json_parser_utils.h"
 #include "runtime/components/tool_use/python_parser_utils.h"
-#include "runtime/util/status_macros.h"
 #include "re2/re2.h"  // from @com_googlesource_code_re2
 
 namespace litert::lm {
@@ -122,15 +121,21 @@ absl::StatusOr<nlohmann::ordered_json> ParseTextAndToolCalls(
 
     // Parse tool calls from the code block.
     if (!code_block.empty()) {
-      nlohmann::ordered_json tool_calls;
+      absl::StatusOr<nlohmann::ordered_json> tool_calls;
       if (syntax_type == SyntaxType::kPython) {
-        ASSIGN_OR_RETURN(tool_calls, ParsePythonExpression(code_block));
+        tool_calls = ParsePythonExpression(code_block);
       } else if (syntax_type == SyntaxType::kJson) {
-        ASSIGN_OR_RETURN(tool_calls, ParseJsonExpression(code_block));
+        tool_calls = ParseJsonExpression(code_block);
       } else {
-        return absl::InvalidArgumentError("Unsupported syntax type.");
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Unsupported syntax type: ", static_cast<int>(syntax_type)));
       }
-      for (const auto& tool_call : tool_calls) {
+      if (!tool_calls.ok()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Failed to parse tool calls from: ", response_str,
+                         " with error: ", tool_calls.status().message()));
+      }
+      for (const auto& tool_call : *tool_calls) {
         result["tool_calls"].push_back(
             {{"type", "function"}, {"function", tool_call}});
       }
