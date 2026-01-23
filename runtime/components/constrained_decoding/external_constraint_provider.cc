@@ -12,28 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_COMPONENTS_CONSTRAINED_DECODING_CONSTRAINT_PROVIDER_H_
-#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_COMPONENTS_CONSTRAINED_DECODING_CONSTRAINT_PROVIDER_H_
+#include "runtime/components/constrained_decoding/external_constraint_provider.h"
 
 #include <memory>
+#include <utility>
+#include <variant>
 
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "runtime/components/constrained_decoding/constraint.h"
 #include "runtime/components/constrained_decoding/constraint_provider_config.h"
+#include "runtime/components/constrained_decoding/external_constraint_config.h"
 
 namespace litert::lm {
 
-// The constraint provider is used to create constraints. The provider should be
-// maintained by the engine across multiple sessions of the same model.
-class ConstraintProvider {
- public:
-  // Creates a constraint from the given constraint argument.
-  virtual absl::StatusOr<std::unique_ptr<Constraint>> CreateConstraint(
-      ConstraintArg constraint_arg) const = 0;
-
-  virtual ~ConstraintProvider() = default;
-};
+absl::StatusOr<std::unique_ptr<Constraint>>
+ExternalConstraintProvider::CreateConstraint(
+    ConstraintArg constraint_arg) const {
+  if (std::holds_alternative<ExternalConstraintArg>(constraint_arg)) {
+    return std::move(
+        std::get<ExternalConstraintArg>(constraint_arg).constraint);
+  }
+  return absl::InvalidArgumentError(
+      "ExternalConstraintProvider only supports ExternalConstraintArg.");
+}
 
 }  // namespace litert::lm
-
-#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_COMPONENTS_CONSTRAINED_DECODING_CONSTRAINT_PROVIDER_H_

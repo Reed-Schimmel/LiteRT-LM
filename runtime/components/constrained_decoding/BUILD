@@ -36,12 +36,40 @@ cc_library(
 )
 
 cc_library(
+    name = "external_constraint_config",
+    hdrs = ["external_constraint_config.h"],
+    deps = [
+        ":constraint",
+    ],
+)
+
+cc_library(
+    name = "llg_constraint_config",
+    hdrs = ["llg_constraint_config.h"],
+)
+
+cc_library(
+    name = "fst_constraint_config",
+    hdrs = ["fst_constraint_config.h"],
+)
+
+cc_library(
+    name = "constraint_provider_config",
+    hdrs = ["constraint_provider_config.h"],
+    deps = [
+        ":external_constraint_config",
+        ":fst_constraint_config",
+        ":llg_constraint_config",
+    ],
+)
+
+cc_library(
     name = "constraint_provider",
     hdrs = ["constraint_provider.h"],
     deps = [
         ":constraint",
+        ":constraint_provider_config",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings:string_view",
     ],
 )
 
@@ -116,6 +144,7 @@ cc_library(
     deps = [
         ":constraint",
         ":constraint_provider",
+        ":constraint_provider_config",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:string_view",
@@ -125,4 +154,122 @@ cc_library(
         "@platforms//os:windows": [":gemma_model_constraint_provider_dll_import"],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "external_constraint_provider",
+    srcs = ["external_constraint_provider.cc"],
+    hdrs = ["external_constraint_provider.h"],
+    deps = [
+        ":constraint",
+        ":constraint_provider",
+        ":constraint_provider_config",
+        ":external_constraint_config",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "llg_constraint",
+    srcs = ["llg_constraint.cc"],
+    hdrs = ["llg_constraint.h"],
+    linkopts = select({
+        "@platforms//os:windows": ["ntdll.lib"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":bitmap",
+        ":constraint",
+        "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@crate_index__llguidance-1.3.0//:llguidance_cc"
+    ] + select({
+        "@platforms//os:windows": [
+            "//rust:alloc_defs",
+            "//rust:global_allocator",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "llg_constraint_provider",
+    srcs = ["llg_constraint_provider.cc"],
+    hdrs = ["llg_constraint_provider.h"],
+    linkopts = select({
+        "@platforms//os:windows": ["ntdll.lib"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":constraint",
+        ":constraint_provider",
+        ":constraint_provider_config",
+        ":llg_constraint",
+        ":llg_constraint_config",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:string_view",
+        "//runtime/components:tokenizer",
+        "@crate_index__llguidance-1.3.0//:llguidance_cc"
+    ] + select({
+        "@platforms//os:windows": [
+            "//rust:alloc_defs",
+            "//rust:global_allocator",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_test(
+    name = "llg_constraint_provider_test",
+    srcs = ["llg_constraint_provider_test.cc"],
+    deps = [
+        ":llg_constraint_config",
+        ":llg_constraint_provider",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+        "//runtime/components:tokenizer",
+        "//runtime/util:test_utils",
+        "@crate_index__llguidance-1.3.0//:llguidance_cc"
+    ],
+)
+
+cc_test(
+    name = "llg_constraint_test",
+    srcs = ["llg_constraint_test.cc"],
+    deps = [
+        ":bitmap",
+        ":constraint",
+        ":constraint_provider",
+        ":llg_constraint_config",
+        ":llg_constraint_provider",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "//runtime/components:tokenizer",
+        "//runtime/util:test_utils",
+    ],
+)
+
+cc_test(
+    name = "external_constraint_provider_test",
+    srcs = ["external_constraint_provider_test.cc"],
+    deps = [
+        ":constraint",
+        ":constraint_provider_config",
+        ":external_constraint_config",
+        ":external_constraint_provider",
+        ":fake_constraint",
+        ":fst_constraint_config",
+        ":llg_constraint_config",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "//runtime/util:test_utils",
+    ],
 )

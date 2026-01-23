@@ -1,3 +1,4 @@
+BUILD.llguidance text eol=lf
 prebuilt/*/*.so filter=lfs diff=lfs merge=lfs -text
 prebuilt/*/*.dylib filter=lfs diff=lfs merge=lfs -text
 prebuilt/*/*.dll filter=lfs diff=lfs merge=lfs -text

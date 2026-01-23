@@ -22,10 +22,10 @@
 #include <vector>
 
 #include "absl/status/statusor.h"  // from @com_google_absl
-#include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json_fwd.hpp"  // from @nlohmann_json
 #include "runtime/components/constrained_decoding/constraint.h"
 #include "runtime/components/constrained_decoding/constraint_provider.h"
+#include "runtime/components/constrained_decoding/constraint_provider_config.h"
 #include "sentencepiece_processor.h"  // from @sentencepiece
 
 #ifndef GEMMA_MODEL_CONSTRAINT_PROVIDER_EXPORT
@@ -159,7 +159,7 @@ class GemmaModelConstraintProvider : public ConstraintProvider {
       const GemmaModelConstraintOptions& options);
 
   absl::StatusOr<std::unique_ptr<Constraint>> CreateConstraint(
-      absl::string_view constraint_string) const override;
+      ConstraintArg constraint_arg) const override;
 
  private:
   explicit GemmaModelConstraintProvider(

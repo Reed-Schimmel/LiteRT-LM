@@ -60,10 +60,30 @@ load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencie
 
 crate_universe_dependencies()
 
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 
 crates_repository(
     name = "crate_index",
+    annotations = {
+        "llguidance": [
+            crate.annotation(
+                additive_build_file = "@//:BUILD.llguidance",
+                gen_build_script = False,
+                patches = [
+                    "@//:PATCH.llguidance_regexvec",
+                    "@//:PATCH.llguidance_numeric",
+                    "@//:PATCH.llguidance_grammar",
+                    "@//:PATCH.llguidance_parser",
+                    "@//:PATCH.llguidance_perf",
+                ],
+            ),
+        ],
+        "toktrie": [
+            crate.annotation(
+                patches = ["@//:PATCH.toktrie"],
+            ),
+        ],
+    },
     cargo_lockfile = "//:Cargo.lock",
     lockfile = "//:cargo-bazel-lock.json",
     manifests = [
@@ -80,6 +100,7 @@ crate_repositories()
 http_archive(
     name = "cxxbridge_cmd",
     build_file = "//cxxbridge_cmd:BUILD.cxxbridge_cmd.bazel",
+    integrity = "sha256-pf/3kWu94FwtuZRp8J3PryA78lsJbMv052GgR5JBLhA=",
     strip_prefix = "cxxbridge-cmd-1.0.149",
     type = "tar.gz",
     urls = ["https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.149.crate"],
