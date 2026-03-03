@@ -29,7 +29,7 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/components/constrained_decoding/constraint.h"
-#if !defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if !defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
 #include "runtime/components/constrained_decoding/gemma_model_constraint_provider.h"
 #endif
 #include "runtime/components/sentencepiece_tokenizer.h"
@@ -183,7 +183,7 @@ FunctionGemmaDataProcessor::Create(
     const Tokenizer* tokenizer,
     const std::vector<std::vector<int>>& stop_token_ids,
     bool enable_constrained_decoding) {
-#if defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   if (enable_constrained_decoding) {
     return absl::FailedPreconditionError(
         "Constrained decoding was disabled at build time.");
@@ -348,7 +348,7 @@ absl::StatusOr<nlohmann::ordered_json> FunctionGemmaDataProcessor::FormatTools(
 absl::StatusOr<std::unique_ptr<Constraint>>
 FunctionGemmaDataProcessor::CreateConstraint(
     const nlohmann::ordered_json& tools) const {
-#if defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   return absl::FailedPreconditionError(
       "Constrained decoding is disabled at build time, but it was requested "
       "for inference.");

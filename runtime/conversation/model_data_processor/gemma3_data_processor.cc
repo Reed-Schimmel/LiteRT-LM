@@ -32,7 +32,7 @@
 #include "nlohmann/json_fwd.hpp"  // from @nlohmann_json
 #include "litert/cc/litert_layout.h"  // from @litert
 #include "runtime/components/constrained_decoding/constraint.h"
-#if !defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if !defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
 #include "runtime/components/constrained_decoding/gemma_model_constraint_provider.h"
 #endif
 #include "runtime/components/preprocessor/audio_preprocessor.h"
@@ -122,7 +122,7 @@ Gemma3DataProcessor::Create(Gemma3DataProcessorConfig config,
                             const Tokenizer* tokenizer,
                             const std::vector<std::vector<int>>& stop_token_ids,
                             bool enable_constrained_decoding) {
-#if defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   if (enable_constrained_decoding) {
     return absl::FailedPreconditionError(
         "Constrained decoding was disabled at build time.");
@@ -465,7 +465,7 @@ absl::StatusOr<ordered_json> Gemma3DataProcessor::FormatTools(
 absl::StatusOr<std::unique_ptr<Constraint>>
 Gemma3DataProcessor::CreateConstraint(
     const nlohmann::ordered_json& tools) const {
-#if defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   return absl::FailedPreconditionError(
       "Constrained decoding is disabled at build time, but it was requested "
       "for inference.");

@@ -27,7 +27,7 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/components/constrained_decoding/constraint.h"
-#if !defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if !defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
 #include "runtime/components/constrained_decoding/gemma_model_constraint_provider.h"
 #endif
 #include "runtime/components/tokenizer.h"
@@ -76,7 +76,7 @@ class FunctionGemmaDataProcessor
   absl::string_view CodeFenceEnd() const override;
 
  private:
-#if defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   explicit FunctionGemmaDataProcessor(
       const FunctionGemmaDataProcessorConfig& config =
           FunctionGemmaDataProcessorConfig(),
@@ -112,7 +112,7 @@ class FunctionGemmaDataProcessor
     return absl::OkStatus();
   }
 
-#if !defined(LITERT_LM_GEMMA_CONSTRAINT_DISABLED)
+#if !defined(LITERT_LM_FST_CONSTRAINTS_DISABLED)
   std::unique_ptr<LiteRtLmGemmaModelConstraintProvider,
                   decltype(&LiteRtLmGemmaModelConstraintProvider_Destroy)>
       constraint_provider_c_;
