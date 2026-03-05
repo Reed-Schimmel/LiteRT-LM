@@ -159,12 +159,11 @@ absl::Status VisionLiteRtCompiledModelExecutor::VisionEncoder::Initialize() {
     }
 #if !defined(LITERT_DISABLE_NPU)
     case Backend::NPU: {
-      LITERT_ASSIGN_OR_RETURN(auto qualcomm_options,
-                              qualcomm::QualcommOptions::Create());
+      LITERT_ASSIGN_OR_RETURN(auto& qualcomm_options,
+        options.GetQualcommOptions());
       qualcomm_options.SetLogLevel(qualcomm::QualcommOptions::LogLevel::kOff);
       qualcomm_options.SetHtpPerformanceMode(
           qualcomm::QualcommOptions::HtpPerformanceMode::kBurst);
-      options.AddOpaqueOptions(std::move(qualcomm_options));
       // TODO: yunandrew - Add support for other NPU backends.
       options.SetHardwareAccelerators(litert::HwAccelerators::kCpu);
       break;

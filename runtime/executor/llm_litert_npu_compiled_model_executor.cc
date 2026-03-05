@@ -1485,12 +1485,11 @@ LlmLiteRtNpuCompiledModelExecutor::Create(
 litert::Expected<litert::Options> CreateLiteRtOptions() {
   LITERT_ASSIGN_OR_RETURN(auto options, ::litert::Options::Create());
   options.SetHardwareAccelerators(litert::HwAccelerators::kCpu);
-  LITERT_ASSIGN_OR_RETURN(auto qnn_opts,
-                          ::litert::qualcomm::QualcommOptions::Create());
+  LITERT_ASSIGN_OR_RETURN(auto& qnn_opts,
+                          options.GetQualcommOptions());
   qnn_opts.SetLogLevel(::litert::qualcomm::QualcommOptions::LogLevel::kOff);
   qnn_opts.SetHtpPerformanceMode(
       ::litert::qualcomm::QualcommOptions::HtpPerformanceMode::kBurst);
-  options.AddOpaqueOptions(std::move(qnn_opts));
   return options;
 }
 
