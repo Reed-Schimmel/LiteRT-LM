@@ -1,4 +1,4 @@
-# Copyright 2025 The ODML Authors.
+# Copyright 2026 The ODML Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,3 +13,53 @@
 # limitations under the License.
 
 """LiteRT LM is a library for running GenAI models on devices."""
+
+from litert_lm.python.interfaces import AbstractBenchmark
+from litert_lm.python.interfaces import AbstractConversation
+from litert_lm.python.interfaces import AbstractEngine
+from litert_lm.python.interfaces import AbstractSession
+from litert_lm.python.interfaces import Backend
+from litert_lm.python.interfaces import BenchmarkInfo
+from litert_lm.python.interfaces import Responses
+from litert_lm.python.interfaces import ToolEventHandler
+from litert_lm.python.litert_lm_ext import _Benchmark  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import _Engine  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import Benchmark  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import BenchmarkInfo as _BenchmarkInfo  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import Conversation  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import Engine  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import LogSeverity  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import Session  # pytype: disable=import-error
+from litert_lm.python.litert_lm_ext import set_min_log_severity  # pytype: disable=import-error
+from litert_lm.python.tools import Tool
+from litert_lm.python.tools import tool_from_function
+
+# Because the C++ class is created by nanobind and the Python
+# interface is a standard ABC, they cannot easily share a formal
+# inheritance tree across the C++/Python boundary. Instead, we use the
+# register() method in the package's entry point to set the
+# relationship.
+AbstractEngine.register(_Engine)
+AbstractConversation.register(Conversation)
+AbstractBenchmark.register(_Benchmark)
+BenchmarkInfo.register(_BenchmarkInfo)
+AbstractSession.register(Session)
+
+__all__ = (
+    "AbstractBenchmark",
+    "AbstractConversation",
+    "AbstractEngine",
+    "AbstractSession",
+    "Backend",
+    "Benchmark",
+    "BenchmarkInfo",
+    "Conversation",
+    "Engine",
+    "LogSeverity",
+    "Responses",
+    "Session",
+    "Tool",
+    "ToolEventHandler",
+    "set_min_log_severity",
+    "tool_from_function",
+)

@@ -16,6 +16,7 @@
 #include <map>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 #include "nanobind/nanobind.h"
@@ -362,10 +363,10 @@ NB_MODULE(litert_lm_ext, module) {
 
   module.def(
       "Engine",
-      [](absl::string_view model_path, const nb::handle& backend,
-         int max_num_tokens, absl::string_view cache_dir,
+      [](std::string_view model_path, const nb::handle& backend,
+         int max_num_tokens, std::string_view cache_dir,
          const nb::handle& vision_backend, const nb::handle& audio_backend,
-         absl::string_view input_prompt_as_hint) {
+         std::string_view input_prompt_as_hint) {
         Backend main_backend = ParseBackend(backend);
         std::optional<Backend> vision_backend_opt = std::nullopt;
         if (!vision_backend.is_none()) {
@@ -738,8 +739,8 @@ NB_MODULE(litert_lm_ext, module) {
 
   module.def(
       "Benchmark",
-      [](absl::string_view model_path, const nb::handle& backend,
-         int prefill_tokens, int decode_tokens, absl::string_view cache_dir) {
+      [](std::string_view model_path, const nb::handle& backend,
+         int prefill_tokens, int decode_tokens, std::string_view cache_dir) {
         auto benchmark = std::make_unique<Benchmark>(
             std::string(model_path), ParseBackend(backend), prefill_tokens,
             decode_tokens, std::string(cache_dir));

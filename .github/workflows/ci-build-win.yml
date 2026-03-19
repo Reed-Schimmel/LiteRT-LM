@@ -117,6 +117,7 @@ jobs:
         run: |
           bazel --output_base="$env:BAZEL_OUTPUT_BASE" `
             build --disk_cache=~/.cache/bazel-windows `
+            --build_tag_filters='-nowindows' `
             //... `
             //runtime/engine:litert_lm_main
 
@@ -130,7 +131,7 @@ jobs:
         run: |
           bazel --output_base="$env:BAZEL_OUTPUT_BASE" `
             test --disk_cache=~/.cache/bazel-windows --test_output=errors `
-            --test_tag_filters=-requires-mac-inputs:hard //...
+            --test_tag_filters='-requires-mac-inputs:hard,-nowindows' //...
 
       - name: Run bazel build on Windows with dynamic linking.
         run: |
