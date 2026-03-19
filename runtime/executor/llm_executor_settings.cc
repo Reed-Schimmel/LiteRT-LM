@@ -95,6 +95,12 @@ std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings) {
   } else {
     os << "hint_waiting_for_completion: Not set\n";
   }
+  if (settings.gpu_context_low_priority.has_value()) {
+    os << "gpu_context_low_priority: "
+       << settings.gpu_context_low_priority.value() << "\n";
+  } else {
+    os << "gpu_context_low_priority: Not set\n";
+  }
   return os;
 }
 

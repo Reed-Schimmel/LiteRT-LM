@@ -1700,6 +1700,10 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
             advanced_settings
                 .wait_for_weights_conversion_complete_in_benchmark);
       }
+      if (advanced_settings.gpu_context_low_priority.has_value() &&
+          advanced_settings.gpu_context_low_priority.value()) {
+        gpu_compilation_options.SetPriority(GpuOptions::Priority::kLow);
+      }
       if (!advanced_settings.preferred_device_substr.empty()) {
         gpu_compilation_options.SetPreferredDeviceSubstr(
             advanced_settings.preferred_device_substr.c_str());

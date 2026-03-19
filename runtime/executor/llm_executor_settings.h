@@ -219,6 +219,13 @@ struct AdvancedSettings {
   // model (most OSS models) on AMD or Mali GPU, we would set this flag to true.
   std::optional<bool> hint_waiting_for_completion;
 
+  // If true, the GPU context priority will be set to low.
+  // This flag is by default nullopt, which means the decision is made by the
+  // runtime.
+  // And for runtime, by default, it is false. If we are running a Generic model
+  // (most OSS models), we would set this flag to true to ensure smooth UI.
+  std::optional<bool> gpu_context_low_priority;
+
   bool operator==(const AdvancedSettings& other) const {
     return prefill_batch_sizes == other.prefill_batch_sizes &&
            num_output_candidates == other.num_output_candidates &&
@@ -243,7 +250,8 @@ struct AdvancedSettings {
            sampler_handles_input == other.sampler_handles_input &&
            allow_src_quantized_fc_conv_ops ==
                other.allow_src_quantized_fc_conv_ops &&
-           hint_waiting_for_completion == other.hint_waiting_for_completion;
+           hint_waiting_for_completion == other.hint_waiting_for_completion &&
+           gpu_context_low_priority == other.gpu_context_low_priority;
   }
 };
 std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings);

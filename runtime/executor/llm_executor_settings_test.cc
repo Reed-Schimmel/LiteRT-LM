@@ -325,9 +325,31 @@ share_constant_tensors: 0
 sampler_handles_input: 0
 allow_src_quantized_fc_conv_ops: 1
 hint_waiting_for_completion: 0
+gpu_context_low_priority: Not set
 
 )");
   EXPECT_EQ(oss.str(), expected_output);
+}
+
+TEST(LlmExecutorConfigTest, AdvancedSettingsWithGpuContextLowPriority) {
+  auto model_assets = ModelAssets::Create(kPathToModel1);
+  ASSERT_OK(model_assets);
+  auto settings = LlmExecutorSettings::CreateDefault(*std::move(model_assets),
+                                                     Backend::GPU_ARTISAN);
+  (*settings).SetAdvancedSettings(AdvancedSettings{
+      .gpu_context_low_priority = true,
+  });
+
+  std::stringstream oss;
+  oss << (*settings);
+  EXPECT_THAT(oss.str(), ::testing::HasSubstr("gpu_context_low_priority: 1"));
+
+  (*settings).SetAdvancedSettings(AdvancedSettings{
+      .gpu_context_low_priority = false,
+  });
+  oss.str("");
+  oss << (*settings);
+  EXPECT_THAT(oss.str(), ::testing::HasSubstr("gpu_context_low_priority: 0"));
 }
 
 TEST(GetWeightCacheFileTest, CacheDirAndModelPath) {
