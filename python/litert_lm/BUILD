@@ -149,6 +149,9 @@ genrule(
 
 py_package(
     name = "litert_lm_pkg",
+    # Explicitly specify packages to avoid including transitively linked shared
+    # libraries (like duplicate .so files in _solib_*/...) in the wheel.
+    packages = ["python.litert_lm"],
     deps = [":litert_lm"],
 )
 
