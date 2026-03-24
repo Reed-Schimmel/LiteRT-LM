@@ -611,10 +611,28 @@ cc_library(
     hdrs = ["llm_executor_settings_utils.h"],
     deps = [
         ":executor_settings_base",
+        ":litert_compiled_model_executor_utils",
+        ":llm_executor_settings",
+        "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-    ],
+        "//runtime/util:file_util",
+        "//runtime/util:litert_status_util",
+        "//runtime/util:scoped_file",
+        "@litert//tflite/delegates/xnnpack:xnnpack_delegate",
+    ] + select({
+        "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_api_with_dynamic_runtime",
+        ],
+        "//conditions:default": [
+            "@litert//litert/cc:litert_common",
+            "@litert//litert/cc:litert_macros",
+            "@litert//litert/cc:litert_options",
+            "@litert//litert/cc/options:litert_cpu_options",
+            "@litert//litert/cc/options:litert_gpu_options",
+        ],
+    }),
 )
 
 cc_test(

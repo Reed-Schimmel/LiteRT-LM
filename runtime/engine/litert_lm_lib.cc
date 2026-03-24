@@ -241,6 +241,7 @@ absl::StatusOr<EngineSettings> CreateEngineSettings(
       .cache_compiled_shaders_only = settings.cache_compiled_shaders_only,
       .share_constant_tensors = settings.share_constant_tensors,
       .sampler_handles_input = settings.sampler_handles_input,
+      .enable_speculative_decoding = settings.enable_speculative_decoding,
   };
   if (settings.conv_type == ConvType::kFloat) {
     advanced_settings.allow_src_quantized_fc_conv_ops = false;
