@@ -696,7 +696,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
             start_step,
             /*steps=*/prefill_length + input_idx));
       }
-      if (signatures_.input_int32_param.has_value()) {
+      if (gpu_optimized_single_buffer_cache_) {
+        LITERT_RETURN_IF_ERROR(signatures_.input_int32_param.has_value());
         RETURN_IF_ERROR(FillSingleBufferCacheParamTensor(
             prefill_input_buffers[signatures_.input_int32_param.value()],
             start_step, ids.size()));
@@ -925,7 +926,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::DecodeInternal(
         decode_input_buffers_[signatures_.input_attn_mask.value()], step,
         /*steps=*/1));
   }
-  if (signatures_.input_int32_param.has_value()) {
+  if (gpu_optimized_single_buffer_cache_) {
+    LITERT_RETURN_IF_ERROR(signatures_.input_int32_param.has_value());
     RETURN_IF_ERROR(FillSingleBufferCacheParamTensor(
         decode_input_buffers_[signatures_.input_int32_param.value()], step, 1));
   }
