@@ -65,11 +65,11 @@ Android, Linux, MacOS, and Windows. `runtime/engine/litert_lm_main.cc` is a
 Please check the corresponding section below depending on your target deployment
 device and your development platform.
 
+Make sure [Git LFS](https://git-lfs.com) is installed, and run `git lfs pull` to
+fetch the latest prebuilt binaries.
+
 > Note: In order to run on GPU on all platforms, we need to take extra steps:
 >
-> 1.  Install [Git LFS](https://git-lfs.com), then run `git lfs checkout` to
->     fetch prebuilt binaries. These steps are required only once if not done
->     before.
 > 1.  Add `--define=litert_link_capi_so=true`
 >     `--define=resolve_symbols_in_exec=false` in the build command.
 > 1.  `mkdir -p <test_dir>; cp <your litert_lm_main> <test_dir>; cp
