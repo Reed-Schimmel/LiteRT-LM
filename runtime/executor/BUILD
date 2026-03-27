@@ -948,7 +948,6 @@ cc_library(
         ":llm_executor_settings",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/strings",
-        "@litert//litert/cc/options:litert_magic_number_options",
         "//runtime/components:model_resources",
         "//runtime/util:litert_status_util",
     ] + select({
@@ -960,6 +959,7 @@ cc_library(
             "@litert//litert/cc:litert_expected",
             "@litert//litert/cc:litert_macros",
             "@litert//litert/cc:litert_model",
+            "@litert//litert/cc/options:litert_magic_number_options",
         ],
     }),
 )
