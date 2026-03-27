@@ -148,6 +148,14 @@ class EngineTest(LiteRtLmTestBase):
     ):
       self.assertEqual(conversation.messages, messages)
 
+  def test_create_conversation_with_extra_context(self):
+    extra_context = {"key": "value"}
+    with (
+        self._create_engine() as engine,
+        engine.create_conversation(extra_context=extra_context) as conversation,
+    ):
+      self.assertEqual(conversation.extra_context, extra_context)
+
   def test_str_input_support(self):
     with (
         self._create_engine() as engine,

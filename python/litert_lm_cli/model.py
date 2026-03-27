@@ -36,16 +36,16 @@ except ImportError:
 
 
 def load_preset(preset: str):
-  """Loads a preset file and returns the tools and messages."""
+  """Loads a preset file and returns the tools, messages and extra_context."""
   print(f"Loading preset from {preset}:")
   if not os.path.exists(preset):
     print(f"Preset file not found: {preset}")
-    return None, None
+    return None, None, None
 
   spec = importlib.util.spec_from_file_location("user_tools", preset)
   if not spec or not spec.loader:
     print(f"Failed to load tools from {preset}")
-    return None, None
+    return None, None, None
 
   user_tools = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(user_tools)
@@ -71,7 +71,11 @@ def load_preset(preset: str):
   for tool in tools:
     print(f"  - {getattr(tool, "__name__", str(tool))}")
 
-  return tools, messages
+  extra_context = getattr(user_tools, "extra_context", None)
+  if extra_context:
+    print(f"- Extra context: {extra_context}")
+
+  return tools, messages, extra_context
 
 
 _GREEN = "\033[92m"
@@ -147,9 +151,10 @@ class Model:
 
       tools = None
       messages = None
+      extra_context = None
       if preset:
-        tools, messages = load_preset(preset)
-        if tools is None:
+        tools, messages, extra_context = load_preset(preset)
+        if tools is None and messages is None and extra_context is None:
           return
 
       handler = LoggingToolEventHandler() if tools else None
@@ -164,7 +169,10 @@ class Model:
       with (
           engine_cm as engine,
           engine.create_conversation(
-              tools=tools, messages=messages, tool_event_handler=handler
+              tools=tools,
+              messages=messages,
+              tool_event_handler=handler,
+              extra_context=extra_context,
           ) as conversation,
       ):
         if prompt:

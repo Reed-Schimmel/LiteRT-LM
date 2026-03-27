@@ -226,9 +226,10 @@ class LiteRTLMCLI:
         """Adds two numbers."""
         return a + b
 
-      # Provides the "system instruction" and "tools"
+      # Provides the "system instruction", "tools", and "extra_context"
       system_instruction = "You are a helpful assistant."
       tools = [add_numbers]
+      extra_context = {"key": "value"}
       ```
 
     Args:

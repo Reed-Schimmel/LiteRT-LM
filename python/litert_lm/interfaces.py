@@ -20,7 +20,6 @@ import abc
 import collections.abc
 import dataclasses
 import enum
-import pathlib
 from typing import Any
 
 
@@ -103,6 +102,7 @@ class AbstractEngine(abc.ABC):
           collections.abc.Sequence[collections.abc.Callable[..., Any]] | None
       ) = None,
       tool_event_handler: ToolEventHandler | None = None,
+      extra_context: collections.abc.Mapping[str, Any] | None = None,
   ) -> AbstractConversation:
     """Creates a new conversation for this engine.
 
@@ -111,6 +111,7 @@ class AbstractEngine(abc.ABC):
           message is a mapping that should contain 'role' and 'content' keys.
         tools: A list of Python functions to be used as tools.
         tool_event_handler: A handler for tool call and tool response events.
+        extra_context: Extra context for the conversation.
     """
 
   @abc.abstractmethod
@@ -129,6 +130,7 @@ class AbstractConversation(abc.ABC):
       messages: A sequence of messages for the conversation preface.
       tools: A list of Python functions to be used as tools.
       tool_event_handler: A handler for tool call and tool response events.
+      extra_context: Extra context for the chat template.
   """
 
   def __init__(
@@ -141,6 +143,7 @@ class AbstractConversation(abc.ABC):
           collections.abc.Sequence[collections.abc.Callable[..., Any]] | None
       ) = None,
       tool_event_handler: ToolEventHandler | None = None,
+      extra_context: collections.abc.Mapping[str, Any] | None = None,
   ):
     """Initializes the instance.
 
@@ -149,10 +152,12 @@ class AbstractConversation(abc.ABC):
           message is a mapping that should contain 'role' and 'content' keys.
         tools: A list of Python functions to be used as tools.
         tool_event_handler: A handler for tool call and tool response events.
+        extra_context: Extra context for the chat template.
     """
     self.messages = messages or []
     self.tools = tools or []
     self.tool_event_handler = tool_event_handler
+    self.extra_context = extra_context or {}
 
   def __enter__(self) -> AbstractConversation:
     """Initializes the conversation."""

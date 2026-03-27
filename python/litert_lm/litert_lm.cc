@@ -13,30 +13,43 @@
 // limitations under the License.
 
 #include <deque>
+#include <exception>
 #include <map>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
+#include <vector>
 
 #include "nanobind/nanobind.h"
 #include "nanobind/stl/optional.h"  // IWYU pragma: keep
-#include "nanobind/stl/shared_ptr.h"
+#include "nanobind/stl/shared_ptr.h"  // IWYU pragma: keep
 #include "nanobind/stl/string_view.h"  // IWYU pragma: keep
 #include "nanobind/stl/unique_ptr.h"   // IWYU pragma: keep
 #include "nanobind/stl/variant.h"      // IWYU pragma: keep
 #include "nanobind/stl/vector.h"       // IWYU pragma: keep
 #include "absl/base/log_severity.h"  // from @com_google_absl
+#include "absl/base/thread_annotations.h"  // from @com_google_absl
 #include "absl/log/globals.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/synchronization/mutex.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
+#include "nlohmann/json_fwd.hpp"  // from @nlohmann_json
 #include "nanobind_json/nanobind_json.hpp"  // from @nanobind_json  // IWYU pragma: keep
 #include "litert/c/internal/litert_logging.h"  // from @litert
 #include "runtime/conversation/conversation.h"
+#include "runtime/conversation/io_types.h"
 #include "runtime/engine/engine.h"
 #include "runtime/engine/engine_factory.h"
-#include "tflite/core/c/c_api_types.h"  // from @litert
+#include "runtime/engine/engine_settings.h"
+#include "runtime/engine/io_types.h"
+#include "runtime/executor/executor_settings_base.h"
 #include "tflite/logger.h"  // from @litert
 #include "tflite/minimal_logging.h"  // from @litert
 
@@ -468,7 +481,8 @@ NB_MODULE(litert_lm_ext, module) {
       .def(
           "create_conversation",
           [](const nb::object& self, const nb::handle& messages,
-             const nb::handle& tools, const nb::handle& tool_event_handler) {
+             const nb::handle& tools, const nb::handle& tool_event_handler,
+             const nb::handle& extra_context) {
             Engine& engine = nb::cast<Engine&>(self);
 
             auto builder = ConversationConfig::Builder();
@@ -503,6 +517,12 @@ NB_MODULE(litert_lm_ext, module) {
               has_preface = true;
             }
 
+            if (!extra_context.is_none()) {
+              json_preface.extra_context =
+                  nb::cast<nlohmann::json>(extra_context);
+              has_preface = true;
+            }
+
             if (has_preface) {
               builder.SetPreface(json_preface);
             }
@@ -515,6 +535,7 @@ NB_MODULE(litert_lm_ext, module) {
             nb::object py_conversation = nb::cast(std::move(conversation));
             py_conversation.attr("_tool_map") = py_tool_map;
             py_conversation.attr("tool_event_handler") = tool_event_handler;
+            py_conversation.attr("extra_context") = extra_context;
             if (messages.is_none()) {
               py_conversation.attr("messages") = nb::list();
             } else {
@@ -529,7 +550,8 @@ NB_MODULE(litert_lm_ext, module) {
           },
           nb::kw_only(), nb::arg("messages") = nb::none(),
           nb::arg("tools") = nb::none(),
-          nb::arg("tool_event_handler") = nb::none())
+          nb::arg("tool_event_handler") = nb::none(),
+          nb::arg("extra_context") = nb::none())
       .def(
           "create_session",
           [](Engine& self) {
@@ -557,6 +579,7 @@ NB_MODULE(litert_lm_ext, module) {
           "run_prefill",
           [](Engine::Session& self, const std::vector<std::string>& contents) {
             std::vector<InputData> input_data;
+            input_data.reserve(contents.size());
             for (const auto& text : contents) {
               input_data.emplace_back(InputText(text));
             }
@@ -580,6 +603,7 @@ NB_MODULE(litert_lm_ext, module) {
           [](Engine::Session& self, const std::vector<std::string>& target_text,
              bool store_token_lengths) {
             std::vector<absl::string_view> target_text_views;
+            target_text_views.reserve(target_text.size());
             for (const auto& text : target_text) {
               target_text_views.push_back(text);
             }
