@@ -295,6 +295,11 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
     main_executor_settings_.SetAdvancedSettings(advanced_settings);
   }
 
+  // Disable delegate clustering for Gemma 4 models.
+  if (metadata.has_llm_model_type() && metadata.llm_model_type().has_gemma4()) {
+    advanced_settings.disable_delegate_clustering = true;
+    main_executor_settings_.SetAdvancedSettings(advanced_settings);
+  }
   if (IsBenchmarkEnabled()) {
     advanced_settings.is_benchmark = true;
     main_executor_settings_.SetAdvancedSettings(advanced_settings);
