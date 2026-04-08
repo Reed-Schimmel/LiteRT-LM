@@ -120,190 +120,6 @@ std::optional<Backend> GetSamplerBackend(const LiteRtLmSettings& settings) {
   return *sampler_backend;
 }
 
-// Creates the EngineSettings from the LiteRtLmSettings.
-absl::StatusOr<EngineSettings> CreateEngineSettings(
-    const LiteRtLmSettings& settings) {
-  ASSIGN_OR_RETURN(ModelAssets model_assets, CreateModelAssets(settings));
-  auto backend_str = settings.backend;
-  ABSL_LOG(INFO) << "Choose backend: " << backend_str;
-  ASSIGN_OR_RETURN(Backend backend,
-                   litert::lm::GetBackendFromString(backend_str));
-  std::optional<Backend> vision_backend = std::nullopt;
-  if (settings.vision_backend.has_value()) {
-    ABSL_LOG(INFO) << "Provided vision backend: " << *settings.vision_backend;
-    ASSIGN_OR_RETURN(vision_backend, litert::lm::GetBackendFromString(
-                                         *settings.vision_backend));
-  }
-  std::optional<Backend> audio_backend = std::nullopt;
-  if (settings.audio_backend.has_value()) {
-    ABSL_LOG(INFO) << "Provided audio backend: " << *settings.audio_backend;
-    ASSIGN_OR_RETURN(audio_backend,
-                     litert::lm::GetBackendFromString(*settings.audio_backend));
-  }
-
-  ASSIGN_OR_RETURN(
-      EngineSettings engine_settings,
-      EngineSettings::CreateDefault(std::move(model_assets), backend,
-                                    vision_backend, audio_backend));
-  if (settings.max_num_tokens > 0) {
-    engine_settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
-        settings.max_num_tokens);
-  }
-  if (settings.force_f32) {
-    engine_settings.GetMutableMainExecutorSettings().SetActivationDataType(
-        litert::lm::ActivationDataType::FLOAT32);
-    if (settings.vision_backend.has_value()) {
-      engine_settings.GetMutableVisionExecutorSettings()->SetActivationDataType(
-          litert::lm::ActivationDataType::FLOAT32);
-    }
-    if (settings.audio_backend.has_value()) {
-      engine_settings.GetMutableAudioExecutorSettings()->SetActivationDataType(
-          litert::lm::ActivationDataType::FLOAT32);
-    }
-  }
-  if (settings.disable_cache) {
-    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(":nocache");
-    if (settings.vision_backend.has_value()) {
-      engine_settings.GetMutableVisionExecutorSettings()->SetCacheDir(
-          ":nocache");
-    }
-    if (settings.audio_backend.has_value()) {
-      engine_settings.GetMutableAudioExecutorSettings()->SetCacheDir(
-          ":nocache");
-    }
-  } else if (!settings.cache_dir.empty()) {
-    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(
-        settings.cache_dir);
-    if (settings.vision_backend.has_value()) {
-      engine_settings.GetMutableVisionExecutorSettings()->SetCacheDir(
-          settings.cache_dir);
-    }
-    if (settings.audio_backend.has_value()) {
-      engine_settings.GetMutableAudioExecutorSettings()->SetCacheDir(
-          settings.cache_dir);
-    }
-  }
-  if (!settings.litert_dispatch_lib_dir.empty()) {
-    engine_settings.GetMutableMainExecutorSettings().SetLitertDispatchLibDir(
-        settings.litert_dispatch_lib_dir);
-  }
-  if (backend == Backend::CPU) {
-    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
-    ASSIGN_OR_RETURN(
-        auto cpu_settings,
-        executor_settings.MutableBackendConfig<litert::lm::CpuConfig>());
-    if (settings.num_cpu_threads > 0) {
-      cpu_settings.number_of_threads = settings.num_cpu_threads;
-    }
-    cpu_settings.prefill_chunk_size = settings.prefill_chunk_size;
-    executor_settings.SetBackendConfig(cpu_settings);
-  }
-  if (backend == Backend::GPU) {
-    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
-    ASSIGN_OR_RETURN(
-        auto gpu_settings,
-        executor_settings.MutableBackendConfig<litert::lm::GpuConfig>());
-    gpu_settings.external_tensor_mode = settings.gpu_external_tensor_mode;
-    executor_settings.SetBackendConfig(gpu_settings);
-  }
-  if (backend == Backend::GPU_ARTISAN) {
-    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
-    executor_settings.SetMaxNumImages(settings.max_num_images);
-    ASSIGN_OR_RETURN(
-        auto gpu_artisan_settings,
-        executor_settings.MutableBackendConfig<litert::lm::GpuArtisanConfig>());
-    gpu_artisan_settings.use_submodel = settings.use_submodel;
-    executor_settings.SetBackendConfig(gpu_artisan_settings);
-  }
-  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
-  if (sampler_backend.has_value()) {
-    engine_settings.GetMutableMainExecutorSettings().SetSamplerBackend(
-        *sampler_backend);
-  }
-
-  AdvancedSettings advanced_settings{
-      .prefill_batch_sizes = settings.prefill_batch_sizes,
-      .num_output_candidates = settings.num_output_candidates,
-      .configure_magic_numbers = settings.configure_magic_numbers,
-      .verify_magic_numbers = settings.verify_magic_numbers,
-      .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,
-      .num_logits_to_print_after_decode =
-          static_cast<uint32_t>(settings.num_logits_to_print_after_decode),
-      .gpu_madvise_original_shared_tensors =
-          settings.gpu_madvise_original_shared_tensors,
-      .is_benchmark = settings.benchmark,
-      .preferred_device_substr = settings.preferred_device_substr,
-      .num_threads_to_upload = settings.num_threads_to_upload,
-      .num_threads_to_compile = settings.num_threads_to_compile,
-      .convert_weights_on_gpu = settings.convert_weights_on_gpu,
-      .wait_for_weights_conversion_complete_in_benchmark =
-          settings.wait_for_weights_conversion_complete_in_benchmark,
-      .optimize_shader_compilation = settings.optimize_shader_compilation,
-      .cache_compiled_shaders_only = settings.cache_compiled_shaders_only,
-      .share_constant_tensors = settings.share_constant_tensors,
-      .sampler_handles_input = settings.sampler_handles_input,
-      .enable_speculative_decoding = settings.enable_speculative_decoding,
-  };
-  if (settings.conv_type == ConvType::kFloat) {
-    advanced_settings.allow_src_quantized_fc_conv_ops = false;
-  } else if (settings.conv_type == ConvType::kInt8) {
-    advanced_settings.allow_src_quantized_fc_conv_ops = true;
-  }
-  if (advanced_settings != AdvancedSettings()) {
-    engine_settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
-        advanced_settings);
-  }
-
-  ABSL_LOG(INFO) << "executor_settings: "
-                 << engine_settings.GetMainExecutorSettings();
-
-  if (engine_settings.GetVisionExecutorSettings().has_value()) {
-    ABSL_LOG(INFO) << "vision_executor_settings: "
-                   << engine_settings.GetVisionExecutorSettings().value();
-  } else {
-    ABSL_LOG(INFO) << "vision_executor_settings: not set";
-  }
-  if (engine_settings.GetAudioExecutorSettings().has_value()) {
-    ABSL_LOG(INFO) << "audio_executor_settings: "
-                   << engine_settings.GetAudioExecutorSettings().value();
-  } else {
-    ABSL_LOG(INFO) << "audio_executor_settings: not set";
-  }
-
-  if (settings.benchmark) {
-    if (settings.multi_turns && settings.async) {
-      // TODO(b/483699181) - Support benchmarking for multi-turns and async.
-      ABSL_LOG(ERROR) << "Benchmark with multi-turns and async do not show "
-                         "results, use sync mode instead.";
-    }
-
-    litert::lm::proto::BenchmarkParams benchmark_params;
-    benchmark_params.set_num_prefill_tokens(settings.benchmark_prefill_tokens);
-    benchmark_params.set_num_decode_tokens(settings.benchmark_decode_tokens);
-    engine_settings.GetMutableBenchmarkParams() = benchmark_params;
-  }
-
-  return engine_settings;
-}
-
-// Creates the SessionConfig from the LiteRtLmSettings.
-SessionConfig CreateSessionConfig(const LiteRtLmSettings& settings) {
-  // Set the session config.
-  auto session_config = litert::lm::SessionConfig::CreateDefault();
-  session_config.SetNumOutputCandidates(settings.num_output_candidates);
-  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
-  if (sampler_backend.has_value()) {
-    session_config.SetSamplerBackend(*sampler_backend);
-  }
-  if (settings.vision_backend.has_value()) {
-    session_config.SetVisionModalityEnabled(true);
-  }
-  if (settings.audio_backend.has_value()) {
-    session_config.SetAudioModalityEnabled(true);
-  }
-  return session_config;
-}
-
 absl::Status PrintMessage(const Message& message,
                           std::stringstream& captured_output,
                           bool streaming = false) {
@@ -608,6 +424,209 @@ void LogMemoryUsage(const LiteRtLmSettings& settings, float peak_mem_mb,
 
 }  // namespace
 
+absl::StatusOr<EngineSettings> CreateEngineSettings(
+    const LiteRtLmSettings& settings) {
+  ASSIGN_OR_RETURN(ModelAssets model_assets, CreateModelAssets(settings));
+  auto backend_str = settings.backend;
+  ABSL_LOG(INFO) << "Choose backend: " << backend_str;
+  ASSIGN_OR_RETURN(Backend backend,
+                   litert::lm::GetBackendFromString(backend_str));
+  std::optional<Backend> vision_backend = std::nullopt;
+  if (settings.vision_backend.has_value()) {
+    ABSL_LOG(INFO) << "Provided vision backend: " << *settings.vision_backend;
+    ASSIGN_OR_RETURN(vision_backend, litert::lm::GetBackendFromString(
+                                         *settings.vision_backend));
+  }
+  std::optional<Backend> audio_backend = std::nullopt;
+  if (settings.audio_backend.has_value()) {
+    ABSL_LOG(INFO) << "Provided audio backend: " << *settings.audio_backend;
+    ASSIGN_OR_RETURN(audio_backend,
+                     litert::lm::GetBackendFromString(*settings.audio_backend));
+  }
+
+  ASSIGN_OR_RETURN(
+      EngineSettings engine_settings,
+      EngineSettings::CreateDefault(std::move(model_assets), backend,
+                                    vision_backend, audio_backend));
+  if (settings.max_num_tokens > 0) {
+    engine_settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
+        settings.max_num_tokens);
+  }
+  if (settings.force_f32) {
+    engine_settings.GetMutableMainExecutorSettings().SetActivationDataType(
+        litert::lm::ActivationDataType::FLOAT32);
+    if (settings.vision_backend.has_value()) {
+      engine_settings.GetMutableVisionExecutorSettings()->SetActivationDataType(
+          litert::lm::ActivationDataType::FLOAT32);
+    }
+    if (settings.audio_backend.has_value()) {
+      engine_settings.GetMutableAudioExecutorSettings()->SetActivationDataType(
+          litert::lm::ActivationDataType::FLOAT32);
+    }
+  }
+  if (settings.disable_cache) {
+    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(":nocache");
+    if (settings.vision_backend.has_value()) {
+      engine_settings.GetMutableVisionExecutorSettings()->SetCacheDir(
+          ":nocache");
+    }
+    if (settings.audio_backend.has_value()) {
+      engine_settings.GetMutableAudioExecutorSettings()->SetCacheDir(
+          ":nocache");
+    }
+  } else if (!settings.cache_dir.empty()) {
+    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(
+        settings.cache_dir);
+    if (settings.vision_backend.has_value()) {
+      engine_settings.GetMutableVisionExecutorSettings()->SetCacheDir(
+          settings.cache_dir);
+    }
+    if (settings.audio_backend.has_value()) {
+      engine_settings.GetMutableAudioExecutorSettings()->SetCacheDir(
+          settings.cache_dir);
+    }
+  }
+  if (!settings.litert_dispatch_lib_dir.empty()) {
+    engine_settings.GetMutableMainExecutorSettings().SetLitertDispatchLibDir(
+        settings.litert_dispatch_lib_dir);
+  }
+  if (backend == Backend::CPU) {
+    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
+    ASSIGN_OR_RETURN(
+        auto cpu_settings,
+        executor_settings.MutableBackendConfig<litert::lm::CpuConfig>());
+    if (settings.num_cpu_threads > 0) {
+      cpu_settings.number_of_threads = settings.num_cpu_threads;
+    }
+    cpu_settings.prefill_chunk_size = settings.prefill_chunk_size;
+    executor_settings.SetBackendConfig(cpu_settings);
+  }
+  if (backend == Backend::GPU) {
+    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
+    ASSIGN_OR_RETURN(
+        auto gpu_settings,
+        executor_settings.MutableBackendConfig<litert::lm::GpuConfig>());
+    gpu_settings.external_tensor_mode = settings.gpu_external_tensor_mode;
+    executor_settings.SetBackendConfig(gpu_settings);
+  }
+  if (backend == Backend::GPU_ARTISAN) {
+    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
+    executor_settings.SetMaxNumImages(settings.max_num_images);
+    ASSIGN_OR_RETURN(
+        auto gpu_artisan_settings,
+        executor_settings.MutableBackendConfig<litert::lm::GpuArtisanConfig>());
+    gpu_artisan_settings.use_submodel = settings.use_submodel;
+    executor_settings.SetBackendConfig(gpu_artisan_settings);
+  }
+  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
+  if (sampler_backend.has_value()) {
+    engine_settings.GetMutableMainExecutorSettings().SetSamplerBackend(
+        *sampler_backend);
+  }
+
+  AdvancedSettings advanced_settings{
+      .prefill_batch_sizes = settings.prefill_batch_sizes,
+      .num_output_candidates = settings.num_output_candidates,
+      .configure_magic_numbers = settings.configure_magic_numbers,
+      .verify_magic_numbers = settings.verify_magic_numbers,
+      .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,
+      .num_logits_to_print_after_decode =
+          static_cast<uint32_t>(settings.num_logits_to_print_after_decode),
+      .gpu_madvise_original_shared_tensors =
+          settings.gpu_madvise_original_shared_tensors,
+      .is_benchmark = settings.benchmark,
+      .preferred_device_substr = settings.preferred_device_substr,
+      .num_threads_to_upload = settings.num_threads_to_upload,
+      .num_threads_to_compile = settings.num_threads_to_compile,
+      .convert_weights_on_gpu = settings.convert_weights_on_gpu,
+      .wait_for_weights_conversion_complete_in_benchmark =
+          settings.wait_for_weights_conversion_complete_in_benchmark,
+      .optimize_shader_compilation = settings.optimize_shader_compilation,
+      .cache_compiled_shaders_only = settings.cache_compiled_shaders_only,
+      .share_constant_tensors = settings.share_constant_tensors,
+      .sampler_handles_input = settings.sampler_handles_input,
+      .enable_speculative_decoding = settings.enable_speculative_decoding,
+  };
+  if (settings.conv_type == ConvType::kFloat) {
+    advanced_settings.allow_src_quantized_fc_conv_ops = false;
+  } else if (settings.conv_type == ConvType::kInt8) {
+    advanced_settings.allow_src_quantized_fc_conv_ops = true;
+  }
+  if (advanced_settings != AdvancedSettings()) {
+    engine_settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
+        advanced_settings);
+  }
+
+  ABSL_LOG(INFO) << "executor_settings: "
+                 << engine_settings.GetMainExecutorSettings();
+
+  if (engine_settings.GetVisionExecutorSettings().has_value()) {
+    ABSL_LOG(INFO) << "vision_executor_settings: "
+                   << engine_settings.GetVisionExecutorSettings().value();
+  } else {
+    ABSL_LOG(INFO) << "vision_executor_settings: not set";
+  }
+  if (engine_settings.GetAudioExecutorSettings().has_value()) {
+    ABSL_LOG(INFO) << "audio_executor_settings: "
+                   << engine_settings.GetAudioExecutorSettings().value();
+  } else {
+    ABSL_LOG(INFO) << "audio_executor_settings: not set";
+  }
+
+  if (settings.benchmark) {
+    if (settings.multi_turns && settings.async) {
+      // TODO(b/483699181) - Support benchmarking for multi-turns and async.
+      ABSL_LOG(ERROR) << "Benchmark with multi-turns and async do not show "
+                         "results, use sync mode instead.";
+    }
+
+    litert::lm::proto::BenchmarkParams benchmark_params;
+    benchmark_params.set_num_prefill_tokens(settings.benchmark_prefill_tokens);
+    benchmark_params.set_num_decode_tokens(settings.benchmark_decode_tokens);
+    engine_settings.GetMutableBenchmarkParams() = benchmark_params;
+  }
+
+  return engine_settings;
+}
+
+absl::StatusOr<std::unique_ptr<litert::lm::Engine>> CreateEngine(
+    const LiteRtLmSettings& settings, const EngineSettings& engine_settings) {
+  ABSL_LOG(INFO) << "Creating engine";
+  ASSIGN_OR_RETURN(auto engine,
+                   litert::lm::EngineFactory::CreateAny(
+                       std::move(engine_settings), settings.input_prompt));
+  if (settings.vision_backend.has_value()) {
+    ASSIGN_OR_RETURN(auto vision_executor_properties,
+                     engine->GetVisionExecutorProperties());
+    ABSL_LOG(INFO) << "Vision executor properties: "
+                   << vision_executor_properties;
+  }
+  if (settings.audio_backend.has_value()) {
+    ASSIGN_OR_RETURN(auto audio_executor_properties,
+                     engine->GetAudioExecutorProperties());
+    ABSL_LOG(INFO) << "Audio executor properties: "
+                   << audio_executor_properties;
+  }
+  return engine;
+}
+
+SessionConfig CreateSessionConfig(const LiteRtLmSettings& settings) {
+  // Set the session config.
+  auto session_config = litert::lm::SessionConfig::CreateDefault();
+  session_config.SetNumOutputCandidates(settings.num_output_candidates);
+  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
+  if (sampler_backend.has_value()) {
+    session_config.SetSamplerBackend(*sampler_backend);
+  }
+  if (settings.vision_backend.has_value()) {
+    session_config.SetVisionModalityEnabled(true);
+  }
+  if (settings.audio_backend.has_value()) {
+    session_config.SetAudioModalityEnabled(true);
+  }
+  return session_config;
+}
+
 // TODO(b/453071109): Check if returning the content list is more appropriate.
 absl::Status BuildContentList(const std::vector<InputData>& input_data,
                               const LiteRtLmSettings& settings,
@@ -694,22 +713,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings,
 
   ASSIGN_OR_RETURN(EngineSettings engine_settings,
                    CreateEngineSettings(settings));
-  ABSL_LOG(INFO) << "Creating engine";
-  ASSIGN_OR_RETURN(auto engine,
-                   litert::lm::EngineFactory::CreateAny(
-                       std::move(engine_settings), settings.input_prompt));
-  if (settings.vision_backend.has_value()) {
-    ASSIGN_OR_RETURN(auto vision_executor_properties,
-                     engine->GetVisionExecutorProperties());
-    ABSL_LOG(INFO) << "Vision executor properties: "
-                   << vision_executor_properties;
-  }
-  if (settings.audio_backend.has_value()) {
-    ASSIGN_OR_RETURN(auto audio_executor_properties,
-                     engine->GetAudioExecutorProperties());
-    ABSL_LOG(INFO) << "Audio executor properties: "
-                   << audio_executor_properties;
-  }
+  ASSIGN_OR_RETURN(auto engine, CreateEngine(settings, engine_settings));
 
   // Get the session config.
   SessionConfig session_config = CreateSessionConfig(settings);
