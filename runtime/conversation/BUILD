@@ -105,7 +105,6 @@ cc_library(
     srcs = ["conversation.cc"],
     hdrs = ["conversation.h"],
     deps = [
-        ":channel_util",
         ":internal_callback_util",
         ":io_types",
         ":prompt_utils",

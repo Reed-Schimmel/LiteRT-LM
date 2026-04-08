@@ -31,6 +31,7 @@
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/synchronization/mutex.h"  // from @com_google_absl
+#include "absl/synchronization/notification.h"  // from @com_google_absl
 #include "absl/time/clock.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
 #include "absl/types/span.h"  // from @com_google_absl
@@ -39,7 +40,6 @@
 #include "runtime/components/constrained_decoding/constraint_provider_config.h"
 #include "runtime/components/constrained_decoding/constraint_provider_factory.h"
 #include "runtime/components/prompt_template.h"
-#include "runtime/conversation/channel_util.h"
 #include "runtime/conversation/internal_callback_util.h"
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/config_registry.h"
@@ -380,91 +380,50 @@ void Conversation::AddTaskController(
 
 absl::StatusOr<Message> Conversation::SendMessage(const Message& message,
                                                   OptionalArgs optional_args) {
-  // Session inputs to be prefilled.
-  std::vector<InputData> session_inputs;
+  absl::Notification done;
+  absl::Status error_status;
+  bool appending = is_appending_message_;
 
-  // If the incoming message is a user message, rewind to the checkpoint that
-  // was saved before the assistant message containing channel content, and
-  // prefill all subsequent messages with channel content removed.
-  if (config_.filter_channel_content_from_kv_cache() &&
-      session_checkpoint_supported_ && IsUserMessage(message)) {
-    ASSIGN_OR_RETURN(std::vector<InputData> rewound_session_inputs,
-                     RewindAndGetInputDataVector());
-    session_inputs.insert(
-        session_inputs.end(),
-        std::make_move_iterator(rewound_session_inputs.begin()),
-        std::make_move_iterator(rewound_session_inputs.end()));
+  absl::Status status = SendMessageAsync(
+      message,
+      [&](absl::StatusOr<Message> message) {
+        if (!message.ok()) {
+          // If the message is an error, set the error status and notify done.
+          error_status = message.status();
+          if (!done.HasBeenNotified()) {
+            done.Notify();
+          }
+          return;
+        }
+
+        if (message->is_null()) {
+          // Message is null when decode is done.
+          if (!done.HasBeenNotified()) {
+            done.Notify();
+          }
+        }
+      },
+      std::move(optional_args));
+
+  if (!status.ok()) {
+    return status;
   }
 
-  ASSIGN_OR_RETURN(const std::string& single_turn_text,
-                   GetSingleTurnText(message, optional_args));
-  absl::MutexLock lock(history_mutex_);  // NOLINT
-  if (message.is_array()) {
-    for (const auto& message : message) {
-      history_.push_back(message);
-    }
-  } else {
-    history_.push_back(message);
+  done.WaitForNotification();
+
+  if (!error_status.ok()) {
+    return error_status;
   }
 
-  ASSIGN_OR_RETURN(
-      auto message_session_inputs,
-      model_data_processor_->ToInputDataVector(
-          single_turn_text, nlohmann::ordered_json::array({message}),
-          optional_args.args.value_or(std::monostate())));
-  session_inputs.insert(session_inputs.end(),
-                        std::make_move_iterator(message_session_inputs.begin()),
-                        std::make_move_iterator(message_session_inputs.end()));
-  RETURN_IF_ERROR(IgnoreEmptyInputError(session_->RunPrefill(session_inputs)));
-  if (is_appending_message_) {
+  if (appending) {
     return Message();
-  } else {
-    if (config_.filter_channel_content_from_kv_cache() &&
-        session_checkpoint_supported_ &&
-        !checkpoint_message_index_.has_value()) {
-      // Before running decode, save a checkpoint for channel content
-      // filtering.
-      if (!session_->SaveCheckpoint(kChannelContentCheckpoint).ok()) {
-        session_checkpoint_supported_ = false;
-      }
-    }
-
-    ASSIGN_OR_RETURN(
-        auto decode_config,
-        CreateDecodeConfig(std::move(optional_args.decoding_constraint),
-                           optional_args.max_output_tokens));
-    ASSIGN_OR_RETURN(Responses responses, session_->RunDecode(decode_config));
-
-    // Extract channel content from the responses. Modifies responses in place.
-    ASSIGN_OR_RETURN(auto channel_content,
-                     ExtractChannelContent(config_.GetChannels(), responses));
-
-    // Convert responses to a message.
-    ASSIGN_OR_RETURN(
-        Message assistant_message,
-        model_data_processor_->ToMessage(
-            responses, optional_args.args.value_or(std::monostate())));
-
-    // Insert channel content into the message.
-    InsertChannelContentIntoMessage(channel_content, assistant_message);
-
-    // Push assistant message onto history.
-    history_.push_back(assistant_message);
-
-    // If the assistant message contains channel content, set the checkpoint
-    // message index to the current message index. This indicates the session
-    // should be rewound to this message and prefilled again when the next user
-    // message is sent to the model. The session checkpoint itself was already
-    // saved right before the model output was decoded.
-    if (config_.filter_channel_content_from_kv_cache() &&
-        session_checkpoint_supported_ &&
-        !checkpoint_message_index_.has_value() &&
-        assistant_message.contains(kChannelsKey)) {
-      checkpoint_message_index_ = history_.size() - 1;
-    }
-
-    return assistant_message;
   }
+
+  absl::MutexLock lock(history_mutex_);
+  if (history_.empty()) {
+    return absl::InternalError("History is empty after SendMessage");
+  }
+  return history_.back();
 }
 
 absl::Status Conversation::SendMessageAsync(
@@ -509,55 +468,58 @@ absl::Status Conversation::SendMessageAsync(
                         std::make_move_iterator(message_session_inputs.begin()),
                         std::make_move_iterator(message_session_inputs.end()));
 
-  absl::AnyInvocable<void(Message)> complete_message_callback =
-      [this](const Message& complete_message) {
-        absl::MutexLock lock(this->history_mutex_);  // NOLINT
-        this->history_.push_back(complete_message);
-
-        // If the assistant message contains channel content, set the checkpoint
-        // message index. This indicates the session should be rewound to this
-        // message and prefilled again when another user message is sent to the
-        // model. The session checkpoint itself was already saved right before
-        // decode.
-        if (config_.filter_channel_content_from_kv_cache() &&
-            session_checkpoint_supported_ &&
-            !checkpoint_message_index_.has_value() &&
-            complete_message.contains(kChannelsKey)) {
-          checkpoint_message_index_ = history_.size() - 1;
-        }
-      };
-
-  absl::AnyInvocable<void()> cancel_callback = [this]() {
-    absl::MutexLock lock(this->history_mutex_);  // NOLINT
-    this->history_.pop_back();
-  };
-
-  auto internal_callback =
-      std::make_shared<absl::AnyInvocable<void(absl::StatusOr<Responses>)>>(
-          CreateInternalCallback(*model_data_processor_,
-                                 optional_args.args.value_or(std::monostate()),
-                                 config_.GetChannels(),
-                                 std::move(user_callback),
-                                 std::move(cancel_callback),
-                                 std::move(complete_message_callback)));
-
-  ASSIGN_OR_RETURN(
-      auto decode_config,
-      CreateDecodeConfig(std::move(optional_args.decoding_constraint),
-                         optional_args.max_output_tokens));
   if (is_appending_message_) {
     ASSIGN_OR_RETURN(
         auto task_controller,
         session_->RunPrefillAsync(
-            session_inputs, [callback = internal_callback](
+            session_inputs, [callback = std::move(user_callback)](
                                 absl::StatusOr<Responses> responses) mutable {
               auto status = IgnoreEmptyInputError(responses.status());
               if (!status.ok()) {
-                (*callback)(responses.status());
+                callback(responses.status());
+              } else {
+                callback(Message());
               }
             }));
     AddTaskController(optional_args.task_group_id, std::move(task_controller));
   } else {
+    absl::AnyInvocable<void(Message)> complete_message_callback =
+        [this](const Message& complete_message) {
+          absl::MutexLock lock(this->history_mutex_);  // NOLINT
+          this->history_.push_back(complete_message);
+
+          // If the assistant message contains channel content, set the
+          // checkpoint message index. This indicates the session should be
+          // rewound to this message and prefilled again when another user
+          // message is sent to the model. The session checkpoint itself was
+          // already saved right before decode.
+          if (config_.filter_channel_content_from_kv_cache() &&
+              session_checkpoint_supported_ &&
+              !checkpoint_message_index_.has_value() &&
+              complete_message.contains(kChannelsKey)) {
+            checkpoint_message_index_ = history_.size() - 1;
+          }
+        };
+
+    absl::AnyInvocable<void()> cancel_callback = [this]() {
+      absl::MutexLock lock(this->history_mutex_);  // NOLINT
+      this->history_.pop_back();
+    };
+
+    auto internal_callback =
+        std::make_shared<absl::AnyInvocable<void(absl::StatusOr<Responses>)>>(
+            CreateInternalCallback(
+                *model_data_processor_,
+                optional_args.args.value_or(std::monostate()),
+                config_.GetChannels(), std::move(user_callback),
+                std::move(cancel_callback),
+                std::move(complete_message_callback)));
+
+    ASSIGN_OR_RETURN(
+        auto decode_config,
+        CreateDecodeConfig(std::move(optional_args.decoding_constraint),
+                           optional_args.max_output_tokens));
+
     ASSIGN_OR_RETURN(
         auto prefill_task_controller,
         session_->RunPrefillAsync(

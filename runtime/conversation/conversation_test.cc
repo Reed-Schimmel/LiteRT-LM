@@ -477,14 +477,26 @@ TEST_P(ConversationTest, SendSingleMessage) {
   absl::string_view expected_input_text =
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(const Message response,
                        conversation->SendMessage(user_message));
@@ -548,14 +560,26 @@ Thinking disabled.<end_of_turn>
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
 
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(
       const Message response,
@@ -634,14 +658,26 @@ Key3: {{ key3 + "\n"}}
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
 
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(
       const Message response,
@@ -696,14 +732,26 @@ TEST_P(ConversationTest, SendMultipleMessages) {
       "Hello world!<end_of_turn>\n"
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(const Message response,
                        conversation->SendMessage(user_messages));
@@ -753,15 +801,28 @@ TEST_P(ConversationTest, SendSingleMessageWithChannel) {
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
 
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
-      .WillOnce(testing::Return(
-          Responses(TaskState::kProcessing,
-                    {"<|channel>thought\nhmm<channel|>I am good."})));
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
+      .WillOnce(
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(
+                Responses(TaskState::kProcessing,
+                          {"<|channel>thought\nhmm<channel|>I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the message.
   ASSERT_OK_AND_ASSIGN(const Message response,
@@ -814,14 +875,27 @@ TEST_P(ConversationTest, SendSingleMessageWithChannelQwenThink) {
       "<start_of_turn>user\n"
       "How are you?<end_of_turn>\n";
 
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
-      .WillOnce(testing::Return(Responses(
-          TaskState::kProcessing, {"<think>\nhmm\n</think>I am good."})));
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
+      .WillOnce(
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing,
+                                    {"<think>\nhmm\n</think>I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the message.
   ASSERT_OK_AND_ASSIGN(const Message response,
@@ -874,8 +948,13 @@ TEST_P(ConversationTest, SendMessageWithChannelContentFiltering) {
                        Conversation::Create(*mock_engine, conversation_config));
 
   // Expect prefill of first user message.
-  EXPECT_CALL(*mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
 
   // Expect checkpoint to be saved after the first user message is prefilled.
   EXPECT_CALL(*mock_session_ptr, SaveCheckpoint("channel_content_checkpoint"))
@@ -883,10 +962,16 @@ TEST_P(ConversationTest, SendMessageWithChannelContentFiltering) {
 
   // Expect decode after first user message. Return response with channel
   // content.
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          Return(Responses(TaskState::kProcessing,
-                           {"<|channel>thought\nhmm<channel|>I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(
+                Responses(TaskState::kProcessing,
+                          {"<|channel>thought\nhmm<channel|>I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the first user message.
   Message user_message_1 = {{"role", "user"}, {"content", "How are you?"}};
@@ -904,11 +989,17 @@ TEST_P(ConversationTest, SendMessageWithChannelContentFiltering) {
       AllOf(HasSubstr("I am good."), Not(HasSubstr("hmm")));
   EXPECT_CALL(
       *mock_session_ptr,
-      RunPrefill(ElementsAre(
-          VariantWith<InputText>(ResultOf(get_text, assistant_message_matcher)),
-          VariantWith<InputText>(
-              ResultOf(get_text, HasSubstr("That's great."))))))
-      .WillOnce(Return(absl::OkStatus()));
+      RunPrefillAsync(ElementsAre(VariantWith<InputText>(ResultOf(
+                                      get_text, assistant_message_matcher)),
+                                  VariantWith<InputText>(ResultOf(
+                                      get_text, HasSubstr("That's great.")))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
 
   // Expect a new checkpoint to be saved after the second user message is
   // prefilled.
@@ -916,8 +1007,14 @@ TEST_P(ConversationTest, SendMessageWithChannelContentFiltering) {
       .WillOnce(Return(absl::OkStatus()));
 
   // Expect decode after second user message.
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
-      .WillOnce(Return(Responses(TaskState::kProcessing, {"Thank you."})));
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
+      .WillOnce(
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"Thank you."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the second user message.
   Message user_message_2 = {{"role", "user"}, {"content", "That's great."}};
@@ -949,13 +1046,23 @@ TEST_P(ConversationTest, SendMultipleMessagesWithHistory) {
       "content": "How are you?"
     }
   )json");
-  EXPECT_CALL(*mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(testing::Return(absl::OkStatus()));
+  EXPECT_CALL(*mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
 
   // The first assistant response.
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the first user message to fill the history.
   ASSERT_OK(conversation->SendMessage(user_message_1));
@@ -979,15 +1086,26 @@ TEST_P(ConversationTest, SendMultipleMessagesWithHistory) {
       "foo<end_of_turn>\n"
       "<start_of_turn>user\n"
       "bar<end_of_turn>\n";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_input_text)))))
-      .WillOnce(testing::Return(absl::OkStatus()));
-
-  // The second assistant response.
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
-      .WillOnce(testing::Return(Responses(TaskState::kProcessing, {"baz"})));
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_input_text))),
+                      testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
+      .WillOnce(
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"baz"}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   // Send the user messages.
   ASSERT_OK(conversation->SendMessage(user_messages));
@@ -2077,15 +2195,26 @@ TEST_P(ConversationTest, SendMessageWithConstraint) {
   // Send a message with the constraint.
   Message user_message = {{"role", "user"}, {"content", "How are you?"}};
 
-  EXPECT_CALL(*mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(testing::Return(absl::OkStatus()));
+  EXPECT_CALL(*mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
 
   // Verify that the constraint is passed to RunDecode.
-  EXPECT_CALL(*mock_session_ptr,
-              RunDecode(testing::Property(&DecodeConfig::GetConstraint,
-                                          mock_constraint_ptr)))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunDecodeAsync(testing::_, testing::Property(&DecodeConfig::GetConstraint,
+                                                   mock_constraint_ptr)))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(
       const Message response,
@@ -2117,10 +2246,21 @@ TEST_P(ConversationTest, Clone) {
 
   // Send a message to populate history.
   Message user_message = {{"role", "user"}, {"content", "Hello"}};
-  EXPECT_CALL(*mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
-      .WillOnce(testing::Return(Responses(TaskState::kProcessing, {"Hi"})));
+  EXPECT_CALL(*mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
+      .WillOnce(
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"Hi"}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
   ASSERT_OK(conversation->SendMessage(user_message));
 
   // Expect Session::Clone to be called.
@@ -2142,11 +2282,21 @@ TEST_P(ConversationTest, Clone) {
   // Verify that sending a message in the cloned conversation works and uses the
   // cloned session.
   Message user_message2 = {{"role", "user"}, {"content", "How are you?"}};
-  EXPECT_CALL(*cloned_mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*cloned_mock_session_ptr, RunDecode(testing::_))
+  EXPECT_CALL(*cloned_mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*cloned_mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK(cloned_conversation->SendMessage(user_message2));
 
@@ -2192,15 +2342,26 @@ TEST_P(ConversationTest, SendMessageWithMaxOutputTokens) {
 
   Message user_message = {{"role", "user"}, {"content", "How are you?"}};
 
-  EXPECT_CALL(*mock_session_ptr, RunPrefill(testing::_))
-      .WillOnce(testing::Return(absl::OkStatus()));
+  EXPECT_CALL(*mock_session_ptr, RunPrefillAsync(testing::_, testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
 
   // Verify that the max_output_tokens is passed to RunDecode.
   EXPECT_CALL(*mock_session_ptr,
-              RunDecode(testing::Property(&DecodeConfig::GetMaxOutputTokens,
-                                          std::make_optional(42))))
+              RunDecodeAsync(testing::_, testing::Property(
+                                             &DecodeConfig::GetMaxOutputTokens,
+                                             std::make_optional(42))))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
 
   ASSERT_OK_AND_ASSIGN(
       const Message response,
@@ -2257,36 +2418,57 @@ TEST(AppendMessageTest, Gemma3Sync) {
   absl::string_view expected_prefill_1 =
       "<start_of_turn>user\nYou are a helpful "
       "assistant.\n\n<end_of_turn>\n<start_of_turn>user\nHello world!";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_1)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_1))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "user"}, {"content", "Hello world!"}},
       {.has_pending_message = true}));
 
   // Append the 2nd message.
   absl::string_view expected_prefill_2 = " This is a long message.";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_2)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_2))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "user"}, {"content", " This is a long message."}},
       {.has_pending_message = true}));
 
   // Append the 3rd message.
   absl::string_view expected_prefill_3 = " continuing...";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_3)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_3))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "user"}, {"content", " continuing..."}},
       {.has_pending_message = true}));
@@ -2294,15 +2476,27 @@ TEST(AppendMessageTest, Gemma3Sync) {
   // Finish appending message.
   absl::string_view expected_prefill_4 =
       " The message is ended.<end_of_turn>\n<start_of_turn>model\n";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_4)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_4))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
   ASSERT_OK_AND_ASSIGN(
       const Message response_appending,
       conversation->SendMessage(
@@ -2540,12 +2734,19 @@ You are a helpful assistant.
 
   // Append the 1st message.
   absl::string_view expected_prefill_1 = "<start_of_turn>user\nHello world!";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_1)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_1))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "user"}, {"content", "Hello world!"}},
       {.has_pending_message = true}));
@@ -2553,36 +2754,57 @@ You are a helpful assistant.
   // Append the 2nd message.
   absl::string_view expected_prefill_2 =
       "<end_of_turn>\n<start_of_turn>model\nNice to meet you.";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_2)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_2))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "model"}, {"content", "Nice to meet you."}},
       {.has_pending_message = true}));
 
   // Append the 3rd message.
   absl::string_view expected_prefill_3 = " How can I help you today?";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_3)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_3))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "model"}, {"content", " How can I help you today?"}},
       {.has_pending_message = true}));
 
   // Append the 4th message.
   absl::string_view expected_prefill_4 = " The message is ended.";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_4)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_4))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(
       Message{{"role", "model"}, {"content", " The message is ended."}},
       {.has_pending_message = true}));
@@ -2592,12 +2814,19 @@ You are a helpful assistant.
 <start_of_turn>user
 ```tool_outputs
 {"location": "Paris", "temperature": 20, "unit": "C", "weather": "Sunny"})";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_5)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_5))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
   ASSERT_OK(conversation->SendMessage(Message{{"role", "tool"},
                                               {"content",
                                                {
@@ -2618,15 +2847,27 @@ You are a helpful assistant.
 ```<end_of_turn>
 <start_of_turn>model
 )";
-  EXPECT_CALL(*mock_session_ptr,
-              RunPrefill(testing::ElementsAre(
-                  testing::VariantWith<InputText>(testing::Property(
-                      &InputText::GetRawTextString, expected_prefill_6)))))
+  EXPECT_CALL(
+      *mock_session_ptr,
+      RunPrefillAsync(testing::ElementsAre(testing::VariantWith<InputText>(
+                          testing::Property(&InputText::GetRawTextString,
+                                            expected_prefill_6))),
+                      testing::_))
       .Times(1)
-      .WillOnce(testing::Return(absl::OkStatus()));
-  EXPECT_CALL(*mock_session_ptr, RunDecode(testing::_))
+      .WillOnce([](const std::vector<InputData>& contents,
+                   absl::AnyInvocable<void(absl::StatusOr<Responses>)>
+                       user_callback) {
+        user_callback(Responses(TaskState::kDone));
+        return nullptr;
+      });
+  EXPECT_CALL(*mock_session_ptr, RunDecodeAsync(testing::_, testing::_))
       .WillOnce(
-          testing::Return(Responses(TaskState::kProcessing, {"I am good."})));
+          [](absl::AnyInvocable<void(absl::StatusOr<Responses>)> user_callback,
+             const DecodeConfig& decode_config) {
+            user_callback(Responses(TaskState::kProcessing, {"I am good."}));
+            user_callback(Responses(TaskState::kDone));
+            return nullptr;
+          });
   ASSERT_OK(conversation->SendMessage(Message{{"role", "tool"},
                                               {"content",
                                                {
