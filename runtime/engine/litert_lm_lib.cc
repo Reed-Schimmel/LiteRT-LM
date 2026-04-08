@@ -198,14 +198,9 @@ absl::StatusOr<std::unique_ptr<Constraint>> CreateRegexConstraint(
                               .constraint_string = constraint_regex});
 }
 
-absl::Status RunSingleTurnConversation(const std::string& input_prompt,
-                                       const LiteRtLmSettings& settings,
-                                       litert::lm::Engine* engine,
-                                       Conversation* conversation) {
-  json content_list = json::array();
-  std::vector<InputData> input_data;
-  input_data.push_back(InputText(input_prompt));
-  RETURN_IF_ERROR(BuildContentList(input_data, settings, content_list));
+absl::StatusOr<std::string> RunSingleTurnConversation(
+    const json& content_list, const LiteRtLmSettings& settings,
+    litert::lm::Engine* engine, Conversation* conversation) {
   std::stringstream captured_output;
   OptionalArgs optional_args;
   if (settings.max_output_tokens > 0) {
@@ -227,7 +222,7 @@ absl::Status RunSingleTurnConversation(const std::string& input_prompt,
     RETURN_IF_ERROR(PrintMessage(model_message, captured_output));
   }
   CheckExpectedOutput(captured_output.str(), settings);
-  return absl::OkStatus();
+  return captured_output.str();
 }
 
 absl::Status RunMultiTurnConversation(const LiteRtLmSettings& settings,
@@ -765,8 +760,14 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings,
                                                  conversation.get()));
       } else {
         ABSL_LOG(INFO) << "Running single-turn conversation";
-        RETURN_IF_ERROR(RunSingleTurnConversation(
-            settings.input_prompt, settings, engine.get(), conversation.get()));
+        json content_list = json::array();
+        std::vector<InputData> input_data;
+        input_data.push_back(InputText(settings.input_prompt));
+        RETURN_IF_ERROR(BuildContentList(input_data, settings, content_list));
+        RETURN_IF_ERROR(RunSingleTurnConversation(content_list, settings,
+                                                  engine.get(),
+                                                  conversation.get())
+                            .status());
       }
     }
     LitertLmMetrics metric;
