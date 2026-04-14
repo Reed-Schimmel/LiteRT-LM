@@ -39,7 +39,9 @@ TEST(LitertLmLoaderTest, GetSectionLocationNotFound) {
       "litert_lm/runtime/testdata/test_lm.litertlm";
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<MemoryMappedFile> mapped_file,
                        MemoryMappedFile::Create(model_path.string()));
-  LitertLmLoader loader(std::move(mapped_file));
+  ASSERT_OK_AND_ASSIGN(auto loader_ptr,
+                       LitertLmLoader::Create(std::move(mapped_file)));
+  auto& loader = *loader_ptr;
 
   BufferKey embedder_key(schema::AnySectionDataType_TFLiteModel,
                          ModelType::kTfLiteEmbedder);
@@ -51,9 +53,10 @@ TEST(LitertLmLoaderTest, InitializeWithSentencePieceFile) {
   const auto model_path =
       std::filesystem::path(::testing::SrcDir()) /
       "litert_lm/runtime/testdata/test_lm.litertlm";
-  auto model_file = ScopedFile::Open(model_path.string());
-  EXPECT_TRUE(model_file.ok());
-  LitertLmLoader loader(std::move(model_file.value()));
+  ASSERT_OK_AND_ASSIGN(auto model_file, ScopedFile::Open(model_path.string()));
+  ASSERT_OK_AND_ASSIGN(auto loader_ptr,
+                       LitertLmLoader::Create(std::move(model_file)));
+  auto& loader = *loader_ptr;
   EXPECT_FALSE(loader.GetHuggingFaceTokenizer());
   EXPECT_GT(loader.GetSentencePieceTokenizer()->Size(), 0);
   EXPECT_GT(loader.GetTFLiteModel(ModelType::kTfLitePrefillDecode).Size(), 0);
@@ -66,9 +69,10 @@ TEST(LitertLmLoaderTest, InitializeWithHuggingFaceFile) {
   const auto model_path =
       std::filesystem::path(::testing::SrcDir()) /
       "litert_lm/runtime/testdata/test_hf_tokenizer.litertlm";
-  auto model_file = ScopedFile::Open(model_path.string());
-  ASSERT_TRUE(model_file.ok());
-  LitertLmLoader loader(std::move(model_file.value()));
+  ASSERT_OK_AND_ASSIGN(auto model_file, ScopedFile::Open(model_path.string()));
+  ASSERT_OK_AND_ASSIGN(auto loader_ptr,
+                       LitertLmLoader::Create(std::move(model_file)));
+  auto& loader = *loader_ptr;
   ASSERT_GT(loader.GetHuggingFaceTokenizer()->Size(), 0);
   ASSERT_FALSE(loader.GetSentencePieceTokenizer());
 }
@@ -79,7 +83,9 @@ TEST(LitertLmLoaderTest, InitializeWithMemoryMappedFile) {
       "litert_lm/runtime/testdata/test_lm.litertlm";
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<MemoryMappedFile> mapped_file,
                        MemoryMappedFile::Create(model_path.string()));
-  LitertLmLoader loader(std::move(mapped_file));
+  ASSERT_OK_AND_ASSIGN(auto loader_ptr,
+                       LitertLmLoader::Create(std::move(mapped_file)));
+  auto& loader = *loader_ptr;
   EXPECT_FALSE(loader.GetHuggingFaceTokenizer());
   EXPECT_GT(loader.GetSentencePieceTokenizer()->Size(), 0);
   EXPECT_GT(loader.GetTFLiteModel(ModelType::kTfLitePrefillDecode).Size(), 0);
@@ -93,7 +99,9 @@ TEST(LitertLmLoaderTest, GetSectionLocationSizeMatch) {
       "litert_lm/runtime/testdata/test_lm.litertlm";
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<MemoryMappedFile> mapped_file,
                        MemoryMappedFile::Create(model_path.string()));
-  LitertLmLoader loader(std::move(mapped_file));
+  ASSERT_OK_AND_ASSIGN(auto loader_ptr,
+                       LitertLmLoader::Create(std::move(mapped_file)));
+  auto& loader = *loader_ptr;
 
   BufferKey sp_key(schema::AnySectionDataType_SP_Tokenizer);
   ASSERT_OK_AND_ASSIGN(auto sp_location, loader.GetSectionLocation(sp_key));

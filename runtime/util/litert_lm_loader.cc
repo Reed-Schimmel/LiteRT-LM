@@ -28,6 +28,7 @@
 
 #include "absl/log/absl_check.h"  // from @com_google_absl
 #include "absl/log/absl_log.h"  // from @com_google_absl
+#include "absl/memory/memory.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/ascii.h"  // from @com_google_absl
@@ -153,11 +154,19 @@ LitertLmLoader::GetScopedFile() {
       "Model source is not a ScopedFile, cannot get ScopedFile.");
 }
 
-// This constructor is used when the model file is already loaded into memory.
-LitertLmLoader::LitertLmLoader(
-    std::shared_ptr<MemoryMappedFile> memory_mapped_model_file)
-    : model_source_(std::move(memory_mapped_model_file)) {
-  ABSL_CHECK_OK(Initialize());
+absl::StatusOr<std::unique_ptr<LitertLmLoader>> LitertLmLoader::Create(
+    ScopedFile model_file) {
+  auto loader = absl::WrapUnique(new LitertLmLoader(std::move(model_file)));
+  RETURN_IF_ERROR(loader->Initialize());
+  return std::move(loader);
+}
+
+absl::StatusOr<std::unique_ptr<LitertLmLoader>> LitertLmLoader::Create(
+    std::shared_ptr<MemoryMappedFile> memory_mapped_model_file) {
+  auto loader =
+      absl::WrapUnique(new LitertLmLoader(std::move(memory_mapped_model_file)));
+  RETURN_IF_ERROR(loader->Initialize());
+  return std::move(loader);
 }
 
 absl::Status LitertLmLoader::Initialize() {

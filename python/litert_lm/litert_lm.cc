@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <deque>
 #include <exception>
 #include <map>
@@ -383,6 +384,10 @@ class Benchmark {
       settings.GetMutableMainExecutorSettings().SetCacheDir(cache_dir_);
     }
 
+    // TODO - b/499315290: Remove the 1024 once the bug is fixed.
+    settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
+        std::max(prefill_tokens_ + decode_tokens_, 1024));
+
     if (enable_speculative_decoding_.has_value()) {
       AdvancedSettings advanced_settings;
       if (settings.GetMutableMainExecutorSettings()
@@ -489,7 +494,7 @@ NB_MODULE(litert_lm_ext, module) {
   module.def(
       "Engine",
       [](std::string_view model_path, const nb::handle& backend,
-         int max_num_tokens, std::string_view cache_dir,
+         std::optional<int> max_num_tokens, std::string_view cache_dir,
          const nb::handle& vision_backend, const nb::handle& audio_backend,
          std::string_view input_prompt_as_hint,
          std::optional<bool> enable_speculative_decoding) {
@@ -507,8 +512,10 @@ NB_MODULE(litert_lm_ext, module) {
         auto settings = VALUE_OR_THROW(EngineSettings::CreateDefault(
             model_assets, main_backend, vision_backend_opt, audio_backend_opt));
 
-        settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
-            max_num_tokens);
+        if (max_num_tokens.has_value()) {
+          settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
+              *max_num_tokens);
+        }
         if (!cache_dir.empty()) {
           settings.GetMutableMainExecutorSettings().SetCacheDir(
               std::string(cache_dir));
@@ -543,7 +550,7 @@ NB_MODULE(litert_lm_ext, module) {
         return py_engine;
       },
       nb::arg("model_path"), nb::arg("backend") = nb::none(),
-      nb::arg("max_num_tokens") = 4096, nb::arg("cache_dir") = "",
+      nb::arg("max_num_tokens") = nb::none(), nb::arg("cache_dir") = "",
       nb::arg("vision_backend") = nb::none(),
       nb::arg("audio_backend") = nb::none(),
       nb::arg("input_prompt_as_hint") = "",

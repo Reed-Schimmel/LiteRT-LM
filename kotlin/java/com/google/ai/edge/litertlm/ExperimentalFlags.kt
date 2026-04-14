@@ -36,10 +36,13 @@ object ExperimentalFlags {
   /**
    * Whether to enable speculative decoding.
    *
+   * If null, use the model's default. If true, enable speculative decoding; an error will be thrown
+   * if the model does not support it. If false, disable it.
+   *
    * Note: This flag is read only when a new [Engine] is created. Changing this value will not
    * affect any existing [Engine] or [Conversation] instances.
    */
-  var enableSpeculativeDecoding: Boolean = false
+  var enableSpeculativeDecoding: Boolean? = null
 
   /**
    * Whether to enable conversation constrained decoding. This is primarily used for function

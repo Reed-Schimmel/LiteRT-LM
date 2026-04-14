@@ -390,7 +390,7 @@ LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
     JNIEnv* env, jclass thiz, jstring model_path, jstring backend,
     jstring vision_backend, jstring audio_backend, jint max_num_tokens,
     jint max_num_images, jstring cache_dir, jboolean enable_benchmark,
-    jboolean enable_speculative_decoding, jstring main_npu_native_library_dir,
+    jobject enable_speculative_decoding, jstring main_npu_native_library_dir,
     jstring vision_npu_native_library_dir, jstring audio_npu_native_library_dir,
     jint main_backend_num_threads, jint audio_backend_num_threads) {
   const char* model_path_chars = env->GetStringUTFChars(model_path, nullptr);
@@ -538,11 +538,18 @@ LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
     settings->GetMutableBenchmarkParams();
   }
 
-  if (enable_speculative_decoding) {
+  if (enable_speculative_decoding != nullptr) {
+    jclass boolean_class = env->FindClass("java/lang/Boolean");
+    jmethodID boolean_value_mid =
+        env->GetMethodID(boolean_class, "booleanValue", "()Z");
+    jboolean is_enabled =
+        env->CallBooleanMethod(enable_speculative_decoding, boolean_value_mid);
+    env->DeleteLocalRef(boolean_class);
+
     auto advanced_settings =
         settings->GetMainExecutorSettings().GetAdvancedSettings().value_or(
             litert::lm::AdvancedSettings());
-    advanced_settings.enable_speculative_decoding = true;
+    advanced_settings.enable_speculative_decoding = (is_enabled == JNI_TRUE);
     settings->GetMutableMainExecutorSettings().SetAdvancedSettings(
         advanced_settings);
   }

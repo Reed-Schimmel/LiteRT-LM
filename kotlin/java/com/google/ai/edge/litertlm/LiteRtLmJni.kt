@@ -58,7 +58,7 @@ internal object LiteRtLmJni {
     maxNumImages: Int,
     cacheDir: String,
     enableBenchmark: Boolean,
-    enableSpeculativeDecoding: Boolean,
+    enableSpeculativeDecoding: Boolean?,
     mainNpuNativeLibraryDir: String,
     visionNpuNativeLibraryDir: String,
     audioNpuNativeLibraryDir: String,

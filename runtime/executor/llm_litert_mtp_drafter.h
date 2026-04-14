@@ -103,39 +103,44 @@ class LlmLiteRtMtpDrafter {
         drafter_output_buffers_(std::move(drafter_output_buffers)),
         verifier_input_buffers_(std::move(verifier_input_buffers)),
         verifier_output_buffers_(std::move(verifier_output_buffers)),
-        num_draft_steps_(num_draft_steps) {}
+        num_draft_steps_(num_draft_steps) {
+    for (const auto& [name, buffer] : drafter_input_buffers_) {
+      auto expected = buffer.Duplicate();
+      active_drafter_input_buffers_[name] = std::move(expected.Value());
+    }
+    for (const auto& [name, buffer] : drafter_output_buffers_) {
+      auto expected = buffer.Duplicate();
+      active_drafter_output_buffers_[name] = std::move(expected.Value());
+    }
+    for (const auto& [name, buffer] : verifier_input_buffers_) {
+      auto expected = buffer.Duplicate();
+      active_verifier_input_buffers_[name] = std::move(expected.Value());
+    }
+    for (const auto& [name, buffer] : verifier_output_buffers_) {
+      auto expected = buffer.Duplicate();
+      active_verifier_output_buffers_[name] = std::move(expected.Value());
+    }
+  }
 
-  absl::StatusOr<absl::flat_hash_map<absl::string_view, TensorBuffer>>
-  PrepareDrafterInputBuffers(
+  absl::Status PrepareDrafterInputBuffers(
       int position, absl::flat_hash_map<absl::string_view, TensorBuffer>&
                         output_kv_cache_buffers);
 
-  absl::StatusOr<absl::flat_hash_map<absl::string_view, TensorBuffer>>
-  PrepareDrafterOutputBuffers();
+  absl::Status PrepareDrafterOutputBuffers();
 
   absl::StatusOr<std::vector<int>> RunDraftingLoop(
-      int token_id, std::optional<TensorBuffer>& activations,
-      absl::flat_hash_map<absl::string_view, TensorBuffer>&
-          mtp_drafter_input_buffers,
-      absl::flat_hash_map<absl::string_view, TensorBuffer>&
-          mtp_drafter_output_buffers);
+      int token_id, std::optional<TensorBuffer>& activations);
 
-  absl::StatusOr<absl::flat_hash_map<absl::string_view, TensorBuffer>>
-  PrepareVerifierInputBuffers(
+  absl::Status PrepareVerifierInputBuffers(
       int position, int token_id, const std::vector<int>& drafted_tokens,
       absl::flat_hash_map<absl::string_view, TensorBuffer>&
           input_kv_cache_buffers);
 
-  absl::StatusOr<absl::flat_hash_map<absl::string_view, TensorBuffer>>
-  PrepareVerifierOutputBuffers(
+  absl::Status PrepareVerifierOutputBuffers(
       absl::flat_hash_map<absl::string_view, TensorBuffer>&
           output_kv_cache_buffers);
 
-  absl::StatusOr<std::vector<int>> RunVerification(
-      const absl::flat_hash_map<absl::string_view, TensorBuffer>&
-          verifier_input_buffers,
-      absl::flat_hash_map<absl::string_view, TensorBuffer>&
-          verifier_output_buffers);
+  absl::StatusOr<std::vector<int>> RunVerification();
 
   // The MTP drafter model.
   CompiledModel mtp_drafter_model_;
@@ -174,6 +179,20 @@ class LlmLiteRtMtpDrafter {
   //   - logits [batch, draft_steps + 1, vocab_size]
   //   - activations [batch, draft_steps + 1, hidden_size]
   absl::flat_hash_map<absl::string_view, TensorBuffer> verifier_output_buffers_;
+
+  // Cached maps for Run to avoid map creation overhead.
+  absl::flat_hash_map<absl::string_view, TensorBuffer>
+      active_drafter_input_buffers_;
+  absl::flat_hash_map<absl::string_view, TensorBuffer>
+      active_drafter_output_buffers_;
+  absl::flat_hash_map<absl::string_view, TensorBuffer>
+      active_verifier_input_buffers_;
+  absl::flat_hash_map<absl::string_view, TensorBuffer>
+      active_verifier_output_buffers_;
+
+  // Pre-allocated temporary tensors for sampling.
+  TensorBuffer drafter_id_tensor_;
+  TensorBuffer verifier_id_tensor_;
 
   // The number of draft steps.
   const int num_draft_steps_;

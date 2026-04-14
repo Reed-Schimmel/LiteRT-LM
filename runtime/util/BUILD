@@ -255,6 +255,7 @@ cc_test(
     srcs = ["file_util_test.cc"],
     deps = [
         ":file_util",
+        ":test_utils",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -512,6 +513,7 @@ cc_library(
         ":scoped_file",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

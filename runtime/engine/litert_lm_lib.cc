@@ -123,36 +123,49 @@ std::optional<Backend> GetSamplerBackend(const LiteRtLmSettings& settings) {
 absl::Status PrintMessage(const Message& message,
                           std::stringstream& captured_output,
                           bool streaming = false) {
-  if (message["content"].is_array()) {
-    for (const auto& content : message["content"]) {
-      if (content["type"] == "text") {
-        captured_output << content["text"].get<std::string>();
-        std::cout << content["text"].get<std::string>();
+  if (message.contains("content")) {
+    if (message["content"].is_array()) {
+      for (const auto& content : message["content"]) {
+        if (content.contains("type") && content["type"] == "text" &&
+            content.contains("text")) {
+          captured_output << content["text"].get<std::string>();
+          std::cout << content["text"].get<std::string>();
+        }
       }
+      if (!streaming) {
+        captured_output << std::endl << std::flush;
+        std::cout << std::endl << std::flush;
+      } else {
+        captured_output << std::flush;
+        std::cout << std::flush;
+      }
+      return absl::OkStatus();
+    } else if (message["content"].is_object() &&
+               message["content"].contains("text") &&
+               message["content"]["text"].is_string()) {
+      if (!streaming) {
+        captured_output << message["content"]["text"].get<std::string>()
+                        << std::endl
+                        << std::flush;
+        std::cout << message["content"]["text"].get<std::string>() << std::endl
+                  << std::flush;
+      } else {
+        captured_output << message["content"]["text"].get<std::string>()
+                        << std::flush;
+        std::cout << message["content"]["text"].get<std::string>()
+                  << std::flush;
+      }
+      return absl::OkStatus();
     }
-    if (!streaming) {
-      captured_output << std::endl << std::flush;
-      std::cout << std::endl << std::flush;
-    } else {
-      captured_output << std::flush;
-      std::cout << std::flush;
-    }
-  } else if (message["content"]["text"].is_string()) {
-    if (!streaming) {
-      captured_output << message["content"]["text"].get<std::string>()
-                      << std::endl
-                      << std::flush;
-      std::cout << message["content"]["text"].get<std::string>() << std::endl
-                << std::flush;
-    } else {
-      captured_output << message["content"]["text"].get<std::string>()
-                      << std::flush;
-      std::cout << message["content"]["text"].get<std::string>() << std::flush;
-    }
-  } else {
-    return absl::InvalidArgumentError("Invalid message: " + message.dump());
   }
-  return absl::OkStatus();
+
+  if (message.contains("tool_calls") ||
+      (message.contains("type") && message["type"] == "function")) {
+    // Gracefully handle function calls without throwing or failing
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError("Invalid message: " + message.dump());
 }
 
 absl::AnyInvocable<void(absl::StatusOr<Message>)> CreatePrintMessageCallback(
@@ -169,8 +182,11 @@ absl::AnyInvocable<void(absl::StatusOr<Message>)> CreatePrintMessageCallback(
       std::cout << std::endl << std::flush;
       return;
     }
-    ABSL_CHECK_OK(PrintMessage(*message, captured_output,
-                               /*streaming=*/true));
+    auto status = PrintMessage(*message, captured_output,
+                               /*streaming=*/true);
+    if (!status.ok()) {
+      ABSL_LOG(ERROR) << "Failed to print message: " << status;
+    }
   };
 }
 
@@ -198,7 +214,7 @@ absl::StatusOr<std::unique_ptr<Constraint>> CreateRegexConstraint(
                               .constraint_string = constraint_regex});
 }
 
-absl::StatusOr<std::string> RunSingleTurnConversation(
+absl::StatusOr<Message> RunSingleTurnConversation(
     const json& content_list, const LiteRtLmSettings& settings,
     litert::lm::Engine* engine, Conversation* conversation) {
   std::stringstream captured_output;
@@ -213,6 +229,8 @@ absl::StatusOr<std::string> RunSingleTurnConversation(
         CreatePrintMessageCallback(captured_output, settings.benchmark),
         std::move(optional_args)));
     RETURN_IF_ERROR(engine->WaitUntilDone(kWaitUntilDoneTimeout));
+    CheckExpectedOutput(captured_output.str(), settings);
+    return conversation->GetHistory().back();
   } else {
     ASSIGN_OR_RETURN(
         auto model_message,
@@ -220,9 +238,9 @@ absl::StatusOr<std::string> RunSingleTurnConversation(
             json::object({{"role", "user"}, {"content", content_list}}),
             std::move(optional_args)));
     RETURN_IF_ERROR(PrintMessage(model_message, captured_output));
+    CheckExpectedOutput(captured_output.str(), settings);
+    return model_message;
   }
-  CheckExpectedOutput(captured_output.str(), settings);
-  return captured_output.str();
 }
 
 absl::Status RunMultiTurnConversation(const LiteRtLmSettings& settings,
@@ -416,7 +434,6 @@ void LogMemoryUsage(const LiteRtLmSettings& settings, float peak_mem_mb,
     }
   }
 }
-
 }  // namespace
 
 absl::StatusOr<EngineSettings> CreateEngineSettings(
@@ -732,9 +749,10 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings,
       ASSIGN_OR_RETURN(session, engine->CreateSession(session_config));
       std::string input_prompt = settings.input_prompt;
       std::string score_target_text = settings.score_target_text.value();
-      ABSL_CHECK_OK(RunScoreText(engine.get(), session.get(), input_prompt,
-                                 {score_target_text},
-                                 /*store_char_and_token_lengths=*/false));
+      RETURN_IF_ERROR(RunScoreText(engine.get(), session.get(), input_prompt,
+                                   {score_target_text},
+                                   /*store_char_and_token_lengths=*/false)
+                          .status());
     } else if (settings.use_session) {
       ABSL_LOG(INFO) << "Creating session";
       ASSIGN_OR_RETURN(session, engine->CreateSession(session_config));
