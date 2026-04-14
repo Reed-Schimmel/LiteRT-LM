@@ -98,6 +98,38 @@ compile LiteRT-LM from source. If you want to build the program from source,
 you should checkout the stable [![Latest
 Release](https://img.shields.io/github/v/release/google-ai-edge/LiteRT-LM)](https://github.com/google-ai-edge/LiteRT-LM/releases/latest) tag.
 
+#### 🛠️ Local Optimized Build (Intel AVX2 & GPU)
+
+If you are compiling LiteRT-LM on a system with an Intel CPU supporting AVX2 and an Intel Xe iGPU, you can optimize your build for maximum inference speed with the following commands.
+
+First, ensure you have pulled all prebuilt binaries, including the WebGPU accelerator required for GPU acceleration:
+```bash
+git lfs pull
+```
+
+Then, compile the core API and CLI wheels with your Hermetic Python version (e.g., 3.14) and the `linux_x86_64` config which inherently enables AVX2 instructions via XNNPACK:
+```bash
+PYTHON_VERSION=3.14
+bazel build \
+    --repo_env=HERMETIC_PYTHON_VERSION=${PYTHON_VERSION} \
+    --@rules_python//python/config_settings:python_version=${PYTHON_VERSION} \
+    --config=linux_x86_64 \
+    -c opt //python/litert_lm:wheel
+
+bazel build \
+    --repo_env=HERMETIC_PYTHON_VERSION=${PYTHON_VERSION} \
+    --@rules_python//python/config_settings:python_version=${PYTHON_VERSION} \
+    --config=linux_x86_64 \
+    -c opt //python/litert_lm_cli:wheel
+```
+
+Install the compiled wheels:
+```bash
+pip install bazel-bin/python/litert_lm/*.whl bazel-bin/python/litert_lm_cli/*.whl --force-reinstall
+```
+
+After installation, the CLI will automatically bundle the WebGPU backend and you can run inference optimized for your hardware using the new backend flag (e.g. `litert-lm serve --backend gpu` or `litert-lm run <model> --backend gpu`).
+
 ---
 
 ## 📦 Releases
