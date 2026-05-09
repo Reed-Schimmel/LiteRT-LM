@@ -34,10 +34,14 @@ _current_engine: Optional[litert_lm.Engine] = None
 _current_model_id: Optional[str] = None
 _current_backend: Optional[str] = None
 _current_max_tokens: Optional[int] = None
+_current_enable_speculative_decoding: Optional[bool] = None
 
 
 def get_engine(
-    model_id: str, backend_str: str = "cpu", max_tokens: Optional[int] = None
+    model_id: str,
+    backend_str: str = "cpu",
+    max_tokens: Optional[int] = None,
+    enable_speculative_decoding: Optional[bool] = None,
 ) -> litert_lm.Engine:
     """Gets or creates the LiteRT-LM engine for the given model ID.
 
@@ -51,6 +55,7 @@ def get_engine(
       model_id: The identifier for the model.
       backend_str: The backend to use (e.g. 'cpu' or 'gpu').
       max_tokens: The maximum number of tokens for the engine.
+      enable_speculative_decoding: Whether to enable speculative decoding.
 
     Returns:
       The initialized LiteRT-LM Engine.
@@ -58,11 +63,12 @@ def get_engine(
     Raises:
       FileNotFoundError: If the model for the given `model_id` is not found.
     """
-    global _current_engine, _current_model_id, _current_backend, _current_max_tokens
+    global _current_engine, _current_model_id, _current_backend, _current_max_tokens, _current_enable_speculative_decoding
     if (
         _current_model_id == model_id
         and _current_backend == backend_str
         and _current_max_tokens == max_tokens
+        and _current_enable_speculative_decoding == enable_speculative_decoding
         and _current_engine is not None
     ):
         return _current_engine
@@ -74,28 +80,36 @@ def get_engine(
         _current_model_id = None
         _current_backend = None
         _current_max_tokens = None
+        _current_enable_speculative_decoding = None
 
     m = model.Model.from_model_id(model_id)
     if not m.exists():
         raise FileNotFoundError(f"Model {model_id} not found")
 
-    click.echo(
-        click.style(
-            f"Initializing engine for model: {m.model_path} with backend: {backend_str}"
-            + (f" and max_tokens: {max_tokens}" if max_tokens else ""),
-            fg="cyan",
-        )
-    )
+    init_msg = f"Initializing engine for model: {m.model_path} with backend: {backend_str}"
+    if max_tokens is not None:
+        init_msg += f", max_tokens: {max_tokens}"
+    if enable_speculative_decoding is not None:
+        init_msg += f", speculative_decoding: {enable_speculative_decoding}"
+
+    click.echo(click.style(init_msg, fg="cyan"))
+
     backend = (
         litert_lm.Backend.GPU if backend_str.lower() == "gpu" else litert_lm.Backend.CPU
     )
-    new_engine = litert_lm.Engine(m.model_path, backend=backend, max_num_tokens=max_tokens)
+    new_engine = litert_lm.Engine(
+        m.model_path,
+        backend=backend,
+        max_num_tokens=max_tokens,
+        enable_speculative_decoding=enable_speculative_decoding,
+    )
     new_engine.__enter__()
 
     _current_engine = new_engine
     _current_model_id = model_id
     _current_backend = backend_str
     _current_max_tokens = max_tokens
+    _current_enable_speculative_decoding = enable_speculative_decoding
     return _current_engine
 
 
@@ -139,7 +153,9 @@ def litertlm_to_gemini_response(
 class GeminiHandler(http.server.BaseHTTPRequestHandler):
     """Handler for Gemini API requests."""
 
+    default_backend: str = "cpu"
     default_max_tokens: Optional[int] = None
+    default_enable_speculative_decoding: Optional[bool] = None
 
     # do_POST is the method name expected by http.server.BaseHTTPRequestHandler
     # to handle POST requests.
@@ -158,7 +174,7 @@ class GeminiHandler(http.server.BaseHTTPRequestHandler):
         # model_spec can be <model_id>[,<backend>][,<max_tokens>]
         parts = model_spec.split(",")
         model_id = parts[0]
-        backend = parts[1] if len(parts) > 1 else "cpu"
+        backend = parts[1] if len(parts) > 1 and parts[1] else self.default_backend
         
         try:
             max_tokens = int(parts[2]) if len(parts) > 2 and parts[2] else self.default_max_tokens
@@ -174,7 +190,12 @@ class GeminiHandler(http.server.BaseHTTPRequestHandler):
             return
 
         try:
-            engine = get_engine(model_id, backend, max_tokens)
+            engine = get_engine(
+                model_id,
+                backend,
+                max_tokens,
+                self.default_enable_speculative_decoding
+            )
         except FileNotFoundError as e:
             self.send_error(404, str(e))
             return
@@ -255,14 +276,22 @@ class GeminiHandler(http.server.BaseHTTPRequestHandler):
                     pass
 
 
-def run_server(port: int, verbose: bool, max_tokens: Optional[int] = None):
+def run_server(
+    port: int,
+    verbose: bool,
+    backend: str,
+    max_tokens: Optional[int] = None,
+    enable_speculative_decoding: Optional[bool] = None,
+):
     """Starts the HTTP server."""
     # The BaseHTTPRequestHandler uses sys.stderr by default for request logs.
     # If verbose is not set, we can quiet down the engine logs.
     if not verbose:
         litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
 
+    GeminiHandler.default_backend = backend
     GeminiHandler.default_max_tokens = max_tokens
+    GeminiHandler.default_enable_speculative_decoding = enable_speculative_decoding
     
     server_address = ("localhost", port)
     httpd = http.server.HTTPServer(server_address, GeminiHandler)
@@ -286,7 +315,7 @@ def register(cli):
   """Registers the serve command."""
 
   @cli.command(
-      help="Start a server with a Gemini compatible API (alpha feature)"
+      help="Start a server with a Gemini compatible API (alpha feature). Supports long contexts, GPU acceleration, and speculative decoding."
   )
   @click.option(
       "--port", "-p", default=9379, type=int, help="Port to listen on"
@@ -297,7 +326,7 @@ def register(cli):
       "--backend",
       type=click.Choice(["cpu", "gpu"], case_sensitive=False),
       default="cpu",
-      help="The backend to use for initialization.",
+      help="The backend hardware to use for initialization.",
   )
   @click.option(
       "--max-tokens",
@@ -305,7 +334,18 @@ def register(cli):
       default=None,
       help="Maximum number of tokens for the engine.",
   )
-  def serve(port: int, verbose: bool, backend: str, max_tokens: Optional[int]):
+  @click.option(
+      "--enable-speculative-decoding/--no-speculative-decoding",
+      default=None,
+      help="Enable speculative decoding for faster generation.",
+  )
+  def serve(
+      port: int,
+      verbose: bool,
+      backend: str,
+      max_tokens: Optional[int],
+      enable_speculative_decoding: Optional[bool],
+  ):
     """Starts a local HTTP server speaking the Gemini API protocol.
 
     Args:
@@ -313,5 +353,6 @@ def register(cli):
       verbose: Whether to enable verbose logging.
       backend: Hardware backend (e.g., cpu or gpu).
       max_tokens: Maximum number of tokens for the engine.
+      enable_speculative_decoding: Whether to enable speculative decoding.
     """
-    run_server(port, verbose, max_tokens)
+    run_server(port, verbose, backend, max_tokens, enable_speculative_decoding)
