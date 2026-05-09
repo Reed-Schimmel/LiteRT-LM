@@ -32,9 +32,13 @@ STREAM_GEN_CONTENT_RE = re.compile(r"^/v1beta/models/([^/\\:]+):streamGenerateCo
 
 _current_engine: Optional[litert_lm.Engine] = None
 _current_model_id: Optional[str] = None
+_current_backend: Optional[str] = None
+_current_max_tokens: Optional[int] = None
 
 
-def get_engine(model_id: str, backend_str: str = "cpu") -> litert_lm.Engine:
+def get_engine(
+    model_id: str, backend_str: str = "cpu", max_tokens: Optional[int] = None
+) -> litert_lm.Engine:
     """Gets or creates the LiteRT-LM engine for the given model ID.
 
     The LiteRT-LM Engine is a globally cached resource. Its lifetime is managed
@@ -46,6 +50,7 @@ def get_engine(model_id: str, backend_str: str = "cpu") -> litert_lm.Engine:
     Args:
       model_id: The identifier for the model.
       backend_str: The backend to use (e.g. 'cpu' or 'gpu').
+      max_tokens: The maximum number of tokens for the engine.
 
     Returns:
       The initialized LiteRT-LM Engine.
@@ -53,8 +58,13 @@ def get_engine(model_id: str, backend_str: str = "cpu") -> litert_lm.Engine:
     Raises:
       FileNotFoundError: If the model for the given `model_id` is not found.
     """
-    global _current_engine, _current_model_id
-    if _current_model_id == model_id and _current_engine is not None:
+    global _current_engine, _current_model_id, _current_backend, _current_max_tokens
+    if (
+        _current_model_id == model_id
+        and _current_backend == backend_str
+        and _current_max_tokens == max_tokens
+        and _current_engine is not None
+    ):
         return _current_engine
 
     # If we are switching models or re-initializing, clear the old one first.
@@ -62,6 +72,8 @@ def get_engine(model_id: str, backend_str: str = "cpu") -> litert_lm.Engine:
         _current_engine.__exit__(None, None, None)
         _current_engine = None
         _current_model_id = None
+        _current_backend = None
+        _current_max_tokens = None
 
     m = model.Model.from_model_id(model_id)
     if not m.exists():
@@ -69,18 +81,21 @@ def get_engine(model_id: str, backend_str: str = "cpu") -> litert_lm.Engine:
 
     click.echo(
         click.style(
-            f"Initializing engine for model: {m.model_path} with backend: {backend_str}",
+            f"Initializing engine for model: {m.model_path} with backend: {backend_str}"
+            + (f" and max_tokens: {max_tokens}" if max_tokens else ""),
             fg="cyan",
         )
     )
     backend = (
         litert_lm.Backend.GPU if backend_str.lower() == "gpu" else litert_lm.Backend.CPU
     )
-    new_engine = litert_lm.Engine(m.model_path, backend=backend)
+    new_engine = litert_lm.Engine(m.model_path, backend=backend, max_num_tokens=max_tokens)
     new_engine.__enter__()
 
     _current_engine = new_engine
     _current_model_id = model_id
+    _current_backend = backend_str
+    _current_max_tokens = max_tokens
     return _current_engine
 
 
@@ -124,6 +139,8 @@ def litertlm_to_gemini_response(
 class GeminiHandler(http.server.BaseHTTPRequestHandler):
     """Handler for Gemini API requests."""
 
+    default_max_tokens: Optional[int] = None
+
     # do_POST is the method name expected by http.server.BaseHTTPRequestHandler
     # to handle POST requests.
     def do_POST(self):  # pylint: disable=invalid-name
@@ -139,20 +156,25 @@ class GeminiHandler(http.server.BaseHTTPRequestHandler):
 
         model_spec = match.group(1)
         # model_spec can be <model_id>[,<backend>][,<max_tokens>]
-    # Support for backend and max_tokens in model_spec is coming soon.
-    parts = model_spec.split(",")
-    model_id = parts[0]
-    backend = parts[1] if len(parts) > 1 else "cpu"
+        parts = model_spec.split(",")
+        model_id = parts[0]
+        backend = parts[1] if len(parts) > 1 else "cpu"
+        
+        try:
+            max_tokens = int(parts[2]) if len(parts) > 2 and parts[2] else self.default_max_tokens
+        except ValueError:
+            self.send_error(400, "Invalid max_tokens in model specification")
+            return
 
-    content_length = int(self.headers.get("Content-Length", 0))
-    try:
-      body = json.loads(self.rfile.read(content_length))
-    except json.JSONDecodeError:
-      self.send_error(400, "Invalid JSON")
-      return
+        content_length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(content_length))
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
 
-    try:
-      engine = get_engine(model_id, backend)
+        try:
+            engine = get_engine(model_id, backend, max_tokens)
         except FileNotFoundError as e:
             self.send_error(404, str(e))
             return
@@ -233,13 +255,15 @@ class GeminiHandler(http.server.BaseHTTPRequestHandler):
                     pass
 
 
-def run_server(port: int, verbose: bool):
+def run_server(port: int, verbose: bool, max_tokens: Optional[int] = None):
     """Starts the HTTP server."""
     # The BaseHTTPRequestHandler uses sys.stderr by default for request logs.
     # If verbose is not set, we can quiet down the engine logs.
     if not verbose:
         litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
 
+    GeminiHandler.default_max_tokens = max_tokens
+    
     server_address = ("localhost", port)
     httpd = http.server.HTTPServer(server_address, GeminiHandler)
     click.echo(
@@ -275,12 +299,19 @@ def register(cli):
       default="cpu",
       help="The backend to use for initialization.",
   )
-  def serve(port: int, verbose: bool, backend: str):
+  @click.option(
+      "--max-tokens",
+      type=int,
+      default=None,
+      help="Maximum number of tokens for the engine.",
+  )
+  def serve(port: int, verbose: bool, backend: str, max_tokens: Optional[int]):
     """Starts a local HTTP server speaking the Gemini API protocol.
 
     Args:
       port: Port to listen on.
       verbose: Whether to enable verbose logging.
       backend: Hardware backend (e.g., cpu or gpu).
+      max_tokens: Maximum number of tokens for the engine.
     """
-    run_server(port, verbose)
+    run_server(port, verbose, max_tokens)
